@@ -11,11 +11,26 @@ include("cl_scoreboard.lua")
 include("cl_objectives.lua")
 include("cl_buymenu.lua")
 
+-- GMod Base missing font for death notices
+surface.CreateFont("HL2MPTypeDeath", {
+    font = "csd",
+    size = 32,
+    weight = 500,
+    antialias = true,
+    additive = true
+})
 --[[---------------------------------------------------------
     Initialize Client Systems
 -----------------------------------------------------------]]
 function GM:Initialize()
     -- Initialize HUD elements if needed
+    surface.CreateFont("HL2MPTypeDeath", {
+        font = "csd",
+        size = 32,
+        weight = 500,
+        antialias = true,
+        additive = true
+    })
 end
 
 

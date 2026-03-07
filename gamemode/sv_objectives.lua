@@ -275,6 +275,13 @@ ZM_MISSIONS["custom_battery_survival"] = {
 
 -- Start a mission (called at round start)
 function ZM_StartMission(missionId)
+    -- Disable custom missions on specific maps that have their own integrated missions
+    if string.lower(game.GetMap()) == "zm_docksoftthedead" then
+        ZM_NotifyAll("Playing on official ZM map: Custom objectives disabled.", Color(150, 150, 150))
+        ZM_CleanupMission()
+        return
+    end
+
     -- OVERRIDE: Check if we are playing on the specific map
     -- EDIT "zm_mapname" TO THE NAME OF THE WORKSHOP MAP YOU DOWNLOADED
     if game.GetMap() == "hns_mallparking_short" then
@@ -543,7 +550,14 @@ end
 
 -- Sync objectives to all clients
 function ZM_SyncObjectives()
-    if not ZM_Mission.active then return end
+    if not ZM_Mission.active then
+        net.Start("ZM_ObjectiveUpdate")
+            net.WriteString("")
+            net.WriteUInt(0, 4)
+            net.WriteUInt(0, 4)
+        net.Broadcast()
+        return
+    end
 
     local missionDef = ZM_MISSIONS[ZM_Mission.missionId]
     if not missionDef then return end
@@ -578,6 +592,8 @@ function ZM_CleanupMission()
 
     timer.Remove("ZM_SurviveTimer")
     timer.Remove("ZM_SurviveCountdown")
+    
+    ZM_SyncObjectives()
 end
 
 -- Console command to set mission
