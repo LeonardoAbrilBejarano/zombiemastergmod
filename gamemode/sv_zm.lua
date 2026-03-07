@@ -140,7 +140,13 @@ net.Receive("ZM_SpawnZombie", function(len, ply)
     if ZM_GetRoundState() ~= ROUND_ACTIVE then return end
 
     local typeId = net.ReadString()
-    local spawnPos = net.ReadVector()
+    local spawnEntIndex = net.ReadUInt(16)
+
+    local spawner = Entity(spawnEntIndex)
+    if not IsValid(spawner) or spawner:GetClass() ~= "ent_zm_spawnpoint" or not spawner:GetNWBool("Active", true) then
+        ZM_Notify(ply, "Invalid or inactive spawn point!", Color(255, 100, 100))
+        return
+    end
 
     local ztype = ZM_ZOMBIE_BY_ID[typeId]
     if not ztype then
@@ -166,25 +172,17 @@ net.Receive("ZM_SpawnZombie", function(len, ply)
         return
     end
 
-    -- Validate spawn position (hull trace)
-    local tr = util.TraceHull({
-        start = spawnPos,
-        endpos = spawnPos + Vector(0, 0, 1),
-        mins = Vector(-16, -16, 0),
-        maxs = Vector(16, 16, 72),
-        mask = MASK_NPCSOLID,
-    })
-
-    if tr.Hit then
-        ZM_Notify(ply, "No room to spawn there!", Color(255, 100, 100))
-        return
-    end
-
-    -- Spawn the zombie
-    local npc = ZM_SpawnZombie(ply, ztype, spawnPos)
-    if npc then
+    -- Queue the zombie in the spawn point
+    if spawner.QueueZombie and spawner:QueueZombie(typeId) then
+        -- Deduct resources immediately when queued
         ZM_DeductResources(ply, ztype.cost)
-        ZM_RecalcPopulation(ply)
+        
+        -- Artificially bump population to prevent over-queueing
+        -- We won't fully recalculate here because it might un-sync, but we can just add to the var
+        ply.zmPopulation = (ply.zmPopulation or 0) + ztype.popCost
+        ZM_SyncPopulation(ply)
+    else
+        ZM_Notify(ply, "Spawn point queue is full!", Color(255, 100, 100))
     end
 end)
 

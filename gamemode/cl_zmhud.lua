@@ -16,7 +16,6 @@ hook.Add("HUDPaint", "ZM_OverheadHUD", function()
     -- Draw ZM overlay
     ZM_DrawResourceBar(w, h)
     ZM_DrawPopulationBar(w, h)
-    ZM_DrawZombiePanel(w, h)
     ZM_DrawPowerPanel(w, h)
     ZM_DrawZMInfo(w, h)
     ZM_DrawSelectedInfo(w, h)
@@ -67,63 +66,7 @@ function ZM_DrawPopulationBar(w, h)
     draw.SimpleText("Pop: " .. ZM_LocalData.population .. " / " .. ZM_LocalData.maxPop, "ZM_Small", w / 2, y + 10, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end
 
--- Zombie spawn buttons (left panel)
-function ZM_DrawZombiePanel(w, h)
-    local panelX = 10
-    local panelY = h / 2 - 160
-    local panelW = 180
-    local btnH = 50
-    local padding = 5
-
-    -- Panel background
-    local totalH = #ZM_ZOMBIE_TYPES * (btnH + padding) + 40
-    draw.RoundedBox(8, panelX, panelY, panelW, totalH, Color(20, 20, 30, 220))
-
-    -- Title
-    draw.SimpleText("SPAWN ZOMBIES", "ZM_Small", panelX + panelW / 2, panelY + 8, Color(255, 100, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
-
-    local y = panelY + 30
-
-    for i, ztype in ipairs(ZM_ZOMBIE_TYPES) do
-        local btnX = panelX + padding
-        local btnW = panelW - padding * 2
-
-        -- Button color (highlight if selected)
-        local btnColor = Color(40, 40, 50, 200)
-        local isSelected = (ZM_LocalData.spawnType == ztype.id)
-        local canAfford = ZM_LocalData.resources >= ztype.cost
-        local canPop = (ZM_LocalData.population + ztype.popCost) <= ZM_LocalData.maxPop
-
-        if isSelected then
-            btnColor = Color(100, 40, 40, 250)
-        elseif not canAfford or not canPop then
-            btnColor = Color(30, 30, 30, 180)
-        end
-
-        -- Mouse hover detection
-        local mx, my = gui.MousePos()
-        if mx >= btnX and mx <= btnX + btnW and my >= y and my <= y + btnH then
-            if canAfford and canPop then
-                btnColor = Color(60, 60, 80, 230)
-                if isSelected then
-                    btnColor = Color(120, 50, 50, 250)
-                end
-            end
-        end
-
-        draw.RoundedBox(4, btnX, y, btnW, btnH, btnColor)
-
-        -- Zombie name
-        local nameColor = canAfford and canPop and ztype.color or Color(100, 100, 100)
-        draw.SimpleText(ztype.name, "ZM_Medium", btnX + 8, y + 4, nameColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-
-        -- Cost
-        local costColor = canAfford and Color(200, 200, 200) or Color(255, 80, 80)
-        draw.SimpleText("Cost: " .. ztype.cost .. "  Pop: " .. ztype.popCost, "ZM_Small", btnX + 8, y + 28, costColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-
-        y = y + btnH + padding
-    end
-end
+-- (Zombie Panel Removed; using Contextual Spawning on red spheres instead)
 
 -- Power buttons (right panel)
 function ZM_DrawPowerPanel(w, h)
@@ -330,8 +273,7 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
 
     local mx, my = gui.MousePos()
 
-    -- Check if clicking on zombie panel buttons
-    if ZM_HandleZombiePanelClick(mx, my) then return end
+    -- Check if clicking on power panel buttons
     if ZM_HandlePowerPanelClick(mx, my) then return end
 
     if mouseCode == MOUSE_LEFT then
@@ -345,17 +287,29 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
                 net.SendToServer()
             end
             ZM_LocalData.currentPower = nil
-        elseif ZM_LocalData.spawnType then
-            -- Spawn zombie at target location
-            local tr = ZM_GetCursorTrace(ply)
-            if tr.Hit then
-                net.Start("ZM_SpawnZombie")
-                    net.WriteString(ZM_LocalData.spawnType)
-                    net.WriteVector(tr.HitPos)
-                net.SendToServer()
-            end
-            -- Keep spawn type selected for rapid spawning
         else
+            -- Check if we clicked on a Spawn Point Sphere
+            local aimVec = gui.ScreenToVector(mx, my)
+            if not aimVec then aimVec = ply:GetAimVector() end
+            
+            local eyePos = ply:EyePos()
+            local clickedSpawn = nil
+            
+            for _, ent in ipairs(ents.FindByClass("ent_zm_spawnpoint")) do
+                if IsValid(ent) and ent:GetNWBool("Active", true) then
+                    local hitPos = util.IntersectRayWithSphere(eyePos, aimVec, ent:GetPos(), 64)
+                    if hitPos then
+                        clickedSpawn = ent
+                        break
+                    end
+                end
+            end
+            
+            if IsValid(clickedSpawn) then
+                ZM_OpenSpawnMenu(clickedSpawn)
+                return
+            end
+
             -- Check if clicking on empty space to start drag select
             zm_isDragSelecting = true
             zm_dragStartX = mx
@@ -363,6 +317,43 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
         end
     end
 end)
+
+-- VGUI Context Menu for Spawn Points
+local zm_spawnMenu = nil
+
+function ZM_OpenSpawnMenu(spawnEnt)
+    if IsValid(zm_spawnMenu) then zm_spawnMenu:Remove() end
+
+    local p = vgui.Create("DFrame")
+    p:SetSize(400, 350)
+    p:SetTitle("Spawn Zombies - " .. (spawnEnt:GetNWString("SpawnName", "Spawn Area")))
+    p:Center()
+    p:MakePopup()
+    
+    local scroll = vgui.Create("DScrollPanel", p)
+    scroll:Dock(FILL)
+
+    for i, ztype in ipairs(ZM_ZOMBIE_TYPES) do
+        local btn = scroll:Add("DButton")
+        btn:SetText(ztype.name .. " (Cost: " .. ztype.cost .. " / Pop: " .. ztype.popCost .. ")")
+        btn:Dock(TOP)
+        btn:DockMargin(5, 5, 5, 0)
+        btn:SetTall(40)
+        btn.DoClick = function()
+            if (ZM_LocalData.resources or 0) >= ztype.cost and ((ZM_LocalData.population or 0) + ztype.popCost) <= (ZM_LocalData.maxPop or 50) then
+                net.Start("ZM_SpawnZombie")
+                    net.WriteString(ztype.id)
+                    net.WriteUInt(spawnEnt:EntIndex(), 16)
+                net.SendToServer()
+                -- Do not close menu automatically so they can spam it, unless we want to?
+                -- p:Close()
+            else
+                surface.PlaySound("buttons/button10.wav")
+            end
+        end
+    end
+    zm_spawnMenu = p
+end
 
 -- Right-click: hold to rotate camera, quick-click to command zombies / deselect
 local zm_wasZM = false
@@ -504,35 +495,7 @@ hook.Add("Think", "ZM_RightClickCamera", function()
     end
 end)
 
--- Handle clicks on zombie spawn panel
-function ZM_HandleZombiePanelClick(mx, my)
-    local panelX = 10
-    local panelY = ScrH() / 2 - 160
-    local panelW = 180
-    local btnH = 50
-    local padding = 5
-
-    local y = panelY + 30
-
-    for i, ztype in ipairs(ZM_ZOMBIE_TYPES) do
-        local btnX = panelX + padding
-        local btnW = panelW - padding * 2
-
-        if mx >= btnX and mx <= btnX + btnW and my >= y and my <= y + btnH then
-            if ZM_LocalData.spawnType == ztype.id then
-                ZM_LocalData.spawnType = nil -- Toggle off
-            else
-                ZM_LocalData.spawnType = ztype.id
-                ZM_LocalData.currentPower = nil -- Deselect power
-            end
-            return true
-        end
-
-        y = y + btnH + padding
-    end
-
-    return false
-end
+-- (Zombie spawn panel removed; replaced by contextual popup)
 
 -- Handle clicks on power panel
 function ZM_HandlePowerPanelClick(mx, my)
@@ -616,22 +579,6 @@ end
 hook.Add("PlayerBindPress", "ZM_Binds", function(ply, bind, pressed)
     if not pressed then return end
     if ply:Team() ~= TEAM_ZM then return end
-
-    -- Number keys 1-5 for zombie types
-    for i = 1, 5 do
-        if bind == "slot" .. i then
-            local ztype = ZM_ZOMBIE_TYPES[i]
-            if ztype then
-                if ZM_LocalData.spawnType == ztype.id then
-                    ZM_LocalData.spawnType = nil
-                else
-                    ZM_LocalData.spawnType = ztype.id
-                    ZM_LocalData.currentPower = nil
-                end
-            end
-            return true
-        end
-    end
 
     -- Q for PhysExplode
     if bind == "lastinv" then

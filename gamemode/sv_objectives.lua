@@ -272,16 +272,87 @@ ZM_MISSIONS["custom_battery_survival"] = {
 -- ============================================================
 -- MISSION SYSTEM FUNCTIONS
 -- ============================================================
+-- MAP-SPECIFIC ZOMBIE SPAWN POINTS
+-- ============================================================
+ZM_MAP_SPAWNPOINTS = {
+    -- Format: mapname = { {pos = Vector, ang = Angle}, ... }
+    ["docksofthedead"] = {
+        { pos = Vector(1176.053589, -673.838074, 102.290039), ang = Angle(-5.466962, 174.335938, -0.000128) },
+        { pos = Vector(2693.938232, -1791.397095, -382.266174), ang = Angle(12.921293, -2.519963, -0.000128) },
+        { pos = Vector(-1414.554443, -878.577576, -204.162659), ang = Angle(5.632240, -75.962540, -0.000128) },
+        { pos = Vector(-2179.603271, -2218.307861, 377.505676), ang = Angle(-3.589503, -62.212814, -0.000128) },
+        { pos = Vector(-377.814606, 451.109985, 26.200813), ang = Angle(-3.307843, 179.870636, -0.000128) },
+        { pos = Vector(1827.108887, -256.268127, 172.322830), ang = Angle(-3.423649, 177.468369, 0.000000) }
+    }
+}
+
+-- Generate pre-defined ZM Spawn Points for the map
+function ZM_SpawnMapSpawnPoints()
+    local theMap = string.lower(game.GetMap())
+    
+    -- Cleanup strictly the procedural spawn points first to prevent dupes
+    for _, ent in ipairs(ents.FindByClass("ent_zm_spawnpoint")) do
+        if IsValid(ent) then ent:Remove() end
+    end
+    
+    -- Fuzzy match the map name (e.g. zm_docksofthedead matches docksofthedead)
+    local matchedSpawns = nil
+    for mapKey, spawnList in pairs(ZM_MAP_SPAWNPOINTS) do
+        if string.find(theMap, mapKey, 1, true) then
+            matchedSpawns = spawnList
+            break
+        end
+    end
+    
+    if matchedSpawns then
+        local count = 0
+        for i, spawnData in ipairs(matchedSpawns) do
+            local sp = ents.Create("ent_zm_spawnpoint")
+            if IsValid(sp) then
+                -- Add +15 to Z so they don't clip into the floor
+                sp:SetPos(spawnData.pos + Vector(0, 0, 15))
+                sp:SetAngles(spawnData.ang)
+                sp:SetNWString("SpawnName", "Spawn Area " .. i)
+                sp:Spawn()
+                sp:Activate()
+                count = count + 1
+            end
+        end
+        print("DEBUG ZM_SpawnMapSpawnPoints: Spawned " .. count .. " ZM spawn points for map " .. theMap)
+        
+        -- Force a sync to the ZM player so they see the new red spheres immediately
+        local zmPly = ZM_GetZMPlayer and ZM_GetZMPlayer() or nil
+        if IsValid(zmPly) then
+            ZM_SyncSpawnPointsToClient(zmPly)
+        end
+    else
+        print("DEBUG ZM_SpawnMapSpawnPoints: No predefined ZM spawn points found for map", theMap)
+    end
+end
+
+-- Spawn them natively as soon as the map logic finishes loading
+hook.Add("InitPostEntity", "ZM_LoadMapSpawns", function()
+    timer.Simple(1, function()
+        ZM_SpawnMapSpawnPoints()
+    end)
+end)
 
 -- Start a mission (called at round start)
 function ZM_StartMission(missionId)
+    -- Clean up previous mission & spawn pints FIRST
+    ZM_CleanupMission()
+
     local theMap = string.lower(game.GetMap())
     print("DEBUG ZM_StartMission MAP NAME CHECK:", theMap)
+    
+    -- Make sure map spawns exist or refresh them
+    ZM_SpawnMapSpawnPoints()
     
     -- Disable custom missions on specific maps that have their own integrated missions
     if string.find(theMap, "docksofthedead", 1, true) then
         ZM_NotifyAll("Playing on official ZM map: Custom objectives disabled.", Color(150, 150, 150))
-        ZM_CleanupMission()
+        -- Don't clean up mission here since we just spawned ZM points; the cleanup should happen before.
+        -- Wait, actually we DO need to cleanup old custom objectives if any existed.
         return
     end
 
@@ -298,9 +369,6 @@ function ZM_StartMission(missionId)
         missionId = keys[math.random(#keys)]
         missionDef = ZM_MISSIONS[missionId]
     end
-
-    -- Clean up previous mission
-    ZM_CleanupMission()
 
     -- Find a good base position (center of player spawns)
     local basePos = Vector(0, 0, 0)
@@ -591,6 +659,12 @@ function ZM_CleanupMission()
     for _, ent in ipairs(ents.FindByClass("ent_zm_objective_*")) do
         if IsValid(ent) then ent:Remove() end
     end
+    
+    -- Remove procedural spawn points
+    for _, ent in ipairs(ents.FindByClass("ent_zm_spawnpoint")) do
+        if IsValid(ent) then ent:Remove() end
+    end
+    
     ZM_Mission.items = {}
 
     timer.Remove("ZM_SurviveTimer")

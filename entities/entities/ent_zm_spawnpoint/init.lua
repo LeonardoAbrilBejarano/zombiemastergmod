@@ -12,8 +12,11 @@ function ENT:Initialize()
     self:PhysicsInit(SOLID_VPHYSICS)
     self:SetMoveType(MOVETYPE_NONE)
     self:SetSolid(SOLID_NONE)
+    
+    -- Crucial: Render mode needs to support transparency, and color must be 0 auth to hide it from humans
+    -- Client script (cl_init.lua) will override drawing for the ZM player using Sprites
     self:SetRenderMode(RENDERMODE_TRANSALPHA)
-    self:SetColor(Color(255, 100, 100, 150))
+    self:SetColor(Color(255, 255, 255, 0))
     self:DrawShadow(false)
 
     -- Network variables

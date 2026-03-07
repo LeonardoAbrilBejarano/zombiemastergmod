@@ -21,7 +21,7 @@
   Los zombies deben poder ser controlados por el jugador, es decir a que direccion pueden ir y a quien atacar.
 
 - Feature 6:
-  Los zombies se pueden spawnear en ciertas zonas del mapa. Habrá una esfera roja que indicara la zona de spawn de los zombies.
+  Los zombies se pueden spawnear en ciertas zonas del mapa. Habrá una esfera roja que indicara la zona de spawn de los zombies. 
 
 - Feature 7:
   El zombie master puede tener habilidades especiales. Estas son activar trampas que aparecerán como esferas amarillas en el mapa, spawnear zombies donde quiera con un coste superior de dinero mientras no este visible para los jugadores ni a una distancia de 200 unidades de los jugadores, o convertirse en un ente especial por un precio muy alto.
