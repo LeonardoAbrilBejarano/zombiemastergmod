@@ -56,7 +56,7 @@ ZM_CONFIG = {
     SURVIVOR_ARMOR      = 50,
     ZM_MOVE_SPEED       = 800,      -- ZM overhead camera speed
     -- Economy
-    STARTING_MONEY      = 3000,
+    STARTING_MONEY      = 16000,
     KILL_REWARD         = 100,
 }
 

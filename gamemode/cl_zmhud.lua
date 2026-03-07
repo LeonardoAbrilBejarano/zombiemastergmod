@@ -283,6 +283,11 @@ local zm_rightMouseHeld = false
 local zm_rightMouseStartTime = 0
 local zm_cameraRotating = false
 
+-- Track left-click drag selection
+local zm_isDragSelecting = false
+local zm_dragStartX = 0
+local zm_dragStartY = 0
+
 -- ZM Mouse input handling (left-click only for GUI actions)
 hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
     local ply = LocalPlayer()
@@ -329,28 +334,32 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
     if ZM_HandleZombiePanelClick(mx, my) then return end
     if ZM_HandlePowerPanelClick(mx, my) then return end
 
-    -- World click (spawn zombie, use power, or select zombie)
-    local tr = ZM_GetCursorTrace(ply)
-    if not tr.Hit then return end
-
     if mouseCode == MOUSE_LEFT then
         if ZM_LocalData.currentPower then
             -- Use power at target location
-            net.Start("ZM_UsePower")
-                net.WriteString(ZM_LocalData.currentPower)
-                net.WriteVector(tr.HitPos)
-            net.SendToServer()
+            local tr = ZM_GetCursorTrace(ply)
+            if tr.Hit then
+                net.Start("ZM_UsePower")
+                    net.WriteString(ZM_LocalData.currentPower)
+                    net.WriteVector(tr.HitPos)
+                net.SendToServer()
+            end
             ZM_LocalData.currentPower = nil
         elseif ZM_LocalData.spawnType then
             -- Spawn zombie at target location
-            net.Start("ZM_SpawnZombie")
-                net.WriteString(ZM_LocalData.spawnType)
-                net.WriteVector(tr.HitPos)
-            net.SendToServer()
+            local tr = ZM_GetCursorTrace(ply)
+            if tr.Hit then
+                net.Start("ZM_SpawnZombie")
+                    net.WriteString(ZM_LocalData.spawnType)
+                    net.WriteVector(tr.HitPos)
+                net.SendToServer()
+            end
             -- Keep spawn type selected for rapid spawning
         else
-            -- Try to select a zombie under cursor
-            ZM_TrySelectZombie(tr)
+            -- Check if clicking on empty space to start drag select
+            zm_isDragSelecting = true
+            zm_dragStartX = mx
+            zm_dragStartY = my
         end
     end
 end)
@@ -360,6 +369,73 @@ local zm_wasZM = false
 hook.Add("GUIMouseReleased", "ZM_MouseRelease", function(mouseCode, aimVector)
     local ply = LocalPlayer()
     if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+
+    if mouseCode == MOUSE_LEFT and zm_isDragSelecting then
+        zm_isDragSelecting = false
+        local mx, my = gui.MousePos()
+        
+        -- If it's a very short drag, treat it as a click
+        if math.abs(mx - zm_dragStartX) < 10 and math.abs(my - zm_dragStartY) < 10 then
+            local tr = ZM_GetCursorTrace(ply, mx, my)
+            if tr.Hit then
+                ZM_TrySelectZombie(tr)
+            else
+                -- Clicked on empty space (no hit)
+                ZM_LocalData.selectedZombies = {}
+            end
+            return
+        end
+        
+        -- Otherwise it's a drag box selection
+        local minX = math.min(mx, zm_dragStartX)
+        local maxX = math.max(mx, zm_dragStartX)
+        local minY = math.min(my, zm_dragStartY)
+        local maxY = math.max(my, zm_dragStartY)
+        
+        -- If not holding ctrl, clear selection first (drag select overrides)
+        if #ZM_LocalData.selectedZombies > 0 and not input.IsKeyDown(KEY_LCONTROL) then
+            ZM_LocalData.selectedZombies = {}
+        end
+        
+        local changed = false
+        for _, npc in ipairs(ents.GetAll()) do
+            if IsValid(npc) and npc:IsNPC() and npc:Health() > 0 then
+                local screenPos = npc:GetPos():ToScreen()
+                if screenPos.visible then
+                    if screenPos.x >= minX and screenPos.x <= maxX and screenPos.y >= minY and screenPos.y <= maxY then
+                        -- Check if already selected
+                        local alreadySelectedIdx = nil
+                        for i, v in ipairs(ZM_LocalData.selectedZombies) do
+                            if v == npc then
+                                alreadySelectedIdx = i
+                                break
+                            end
+                        end
+                        
+                        -- If holding ctrl, toggle selection. If not holding ctrl, it always selects since we cleared the table above
+                        if alreadySelectedIdx and input.IsKeyDown(KEY_LCONTROL) then
+                            table.remove(ZM_LocalData.selectedZombies, alreadySelectedIdx)
+                            changed = true
+                        elseif not alreadySelectedIdx then
+                            table.insert(ZM_LocalData.selectedZombies, npc)
+                            changed = true
+                        end
+                    end
+                end
+            end
+        end
+        
+        if changed or not input.IsKeyDown(KEY_LCONTROL) then
+            -- We always send an update if ctrl wasn't held (to clear any existing selection) or if something actually changed
+            net.Start("ZM_SelectZombies")
+                net.WriteUInt(#ZM_LocalData.selectedZombies, 8)
+                for _, npc in ipairs(ZM_LocalData.selectedZombies) do
+                    net.WriteEntity(npc)
+                end
+            net.SendToServer()
+        end
+        return
+    end
 
     if mouseCode == MOUSE_RIGHT and zm_rightMouseHeld then
         zm_rightMouseHeld = false
@@ -493,12 +569,31 @@ end
 -- Try to select a zombie under the cursor
 function ZM_TrySelectZombie(tr)
     local hitEnt = tr.Entity
+    
     if IsValid(hitEnt) and hitEnt:IsNPC() then
-        -- Add to selection (or replace if not holding ctrl)
-        if not input.IsKeyDown(KEY_LCONTROL) then
-            ZM_LocalData.selectedZombies = {}
+        local alreadySelectedIdx = nil
+        for i, v in ipairs(ZM_LocalData.selectedZombies) do
+            if v == hitEnt then
+                alreadySelectedIdx = i
+                break
+            end
         end
-        table.insert(ZM_LocalData.selectedZombies, hitEnt)
+        
+        if input.IsKeyDown(KEY_LCONTROL) then
+            -- Holding Ctrl: Toggle specific zombie
+            if alreadySelectedIdx then
+                table.remove(ZM_LocalData.selectedZombies, alreadySelectedIdx)
+            else
+                table.insert(ZM_LocalData.selectedZombies, hitEnt)
+            end
+        else
+            -- Not holding Ctrl: Select only this zombie (or do nothing if it's the only one selected)
+            if alreadySelectedIdx and #ZM_LocalData.selectedZombies == 1 then
+                -- It's the only one selected, do nothing
+            else
+                ZM_LocalData.selectedZombies = { hitEnt }
+            end
+        end
 
         net.Start("ZM_SelectZombies")
             net.WriteUInt(#ZM_LocalData.selectedZombies, 8)
@@ -508,7 +603,12 @@ function ZM_TrySelectZombie(tr)
         net.SendToServer()
     else
         -- Click on empty space - deselect all
-        ZM_LocalData.selectedZombies = {}
+        if #ZM_LocalData.selectedZombies > 0 then
+            ZM_LocalData.selectedZombies = {}
+            net.Start("ZM_SelectZombies")
+                net.WriteUInt(0, 8)
+            net.SendToServer()
+        end
     end
 end
 
@@ -631,5 +731,31 @@ hook.Add("PostDrawOpaqueRenderables", "ZM_HighlightZombies", function()
 
     if #allZombies > 0 then
         halo.Add(allZombies, Color(100, 200, 100, 50), 1, 1, 1)
+    end
+end)
+
+-- Draw drag selection box
+hook.Add("HUDPaint", "ZM_DrawDragSelect", function()
+    local ply = LocalPlayer()
+    if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+
+    if zm_isDragSelecting then
+        local mx, my = gui.MousePos()
+        
+        local minX = math.min(mx, zm_dragStartX)
+        local maxX = math.max(mx, zm_dragStartX)
+        local minY = math.min(my, zm_dragStartY)
+        local maxY = math.max(my, zm_dragStartY)
+        
+        local w = maxX - minX
+        local h = maxY - minY
+        
+        if w > 5 or h > 5 then
+            surface.SetDrawColor(255, 30, 30, 5)
+            surface.DrawRect(minX, minY, w, h)
+            
+            surface.SetDrawColor(255, 30, 30, 120)
+            surface.DrawOutlinedRect(minX, minY, w, h)
+        end
     end
 end)
