@@ -34,3 +34,6 @@
 
 - Feature 10:
   Mejorar el hud.
+
+  -Feature 11:
+  Los jugadores saldran con un set de armas por defecto, y solo pueden llevar un arma principal y una pistola. Cuando compren un arma, este se sustituirá a la principal actual.

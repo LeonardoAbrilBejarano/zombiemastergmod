@@ -197,22 +197,33 @@ end
 
 -- Selected zombie info (bottom center)
 function ZM_DrawSelectedInfo(w, h)
-    if #ZM_LocalData.selectedZombies == 0 then return end
-
-    local count = #ZM_LocalData.selectedZombies
     local alive = 0
-    for _, npc in ipairs(ZM_LocalData.selectedZombies) do
-        if IsValid(npc) and npc:IsNPC() and npc:Health() > 0 then
-            alive = alive + 1
+    if ZM_LocalData.selectedZombies then
+        for _, npc in ipairs(ZM_LocalData.selectedZombies) do
+            if IsValid(npc) and npc:IsNPC() and npc:Health() > 0 then
+                alive = alive + 1
+            end
         end
     end
 
-    local panelW = 200
+    local panelW = 240
     local x = w / 2 - panelW / 2
     local y = h - 100
 
-    draw.RoundedBox(6, x, y, panelW, 40, Color(20, 20, 30, 220))
-    draw.SimpleText("Selected: " .. alive .. " zombie" .. (alive ~= 1 and "s" or ""), "ZM_Medium", w / 2, y + 20, Color(255, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    draw.RoundedBox(6, x, y, panelW, 50, Color(20, 20, 30, 220))
+    if alive > 0 then
+        draw.SimpleText("Selected: " .. alive .. " zombie" .. (alive ~= 1 and "s" or ""), "ZM_Medium", w / 2, y + 15, Color(255, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        
+        -- Draw Deselect All button background
+        draw.RoundedBox(4, x + 10, y + 30, panelW - 20, 15, Color(60, 40, 40, 200))
+        draw.SimpleText("Mid-Click to Deselect", "ZM_Small", w / 2, y + 30, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+    else
+        draw.SimpleText("No zombies selected", "ZM_Medium", w / 2, y + 15, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        
+        -- Draw Select All button background
+        draw.RoundedBox(4, x + 10, y + 30, panelW - 20, 15, Color(40, 60, 40, 200))
+        draw.SimpleText("Mid-Click to Select All", "ZM_Small", w / 2, y + 30, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+    end
 end
 
 -- Crosshair for ZM
@@ -251,8 +262,12 @@ function ZM_DrawCrosshair(w, h)
 end
 
 -- Helper function to get world trace from mouse cursor
-function ZM_GetCursorTrace(ply)
-    local mx, my = gui.MousePos()
+function ZM_GetCursorTrace(ply, optX, optY)
+    local mx, my = optX, optY
+    if not mx or not my then
+        mx, my = gui.MousePos()
+    end
+    
     local aimVec = gui.ScreenToVector(mx, my)
     if not aimVec then aimVec = ply:GetAimVector() end
     
@@ -266,12 +281,47 @@ end
 -- Track right-click camera dragging state
 local zm_rightMouseHeld = false
 local zm_rightMouseStartTime = 0
-local zm_rightMouseMoved = false
+local zm_cameraRotating = false
 
 -- ZM Mouse input handling (left-click only for GUI actions)
 hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
     local ply = LocalPlayer()
     if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+
+    if mouseCode == MOUSE_RIGHT then
+        zm_rightMouseHeld = true
+        zm_rightMouseStartTime = RealTime()
+        zm_cameraRotating = false
+        
+        if #ZM_LocalData.selectedZombies == 0 then
+            zm_cameraRotating = true
+            gui.EnableScreenClicker(false)
+        end
+        return
+    end
+    
+    if mouseCode == MOUSE_MIDDLE then
+        if #ZM_LocalData.selectedZombies > 0 then
+            -- Deselect all
+            ZM_LocalData.selectedZombies = {}
+        else
+            -- Select all
+            for _, npc in ipairs(ents.GetAll()) do
+                if IsValid(npc) and npc:IsNPC() and npc:Health() > 0 then
+                    table.insert(ZM_LocalData.selectedZombies, npc)
+                end
+            end
+            if #ZM_LocalData.selectedZombies > 0 then
+                net.Start("ZM_SelectZombies")
+                    net.WriteUInt(#ZM_LocalData.selectedZombies, 8)
+                    for _, npc in ipairs(ZM_LocalData.selectedZombies) do
+                        net.WriteEntity(npc)
+                    end
+                net.SendToServer()
+            end
+        end
+        return
+    end
 
     local mx, my = gui.MousePos()
 
@@ -307,6 +357,44 @@ end)
 
 -- Right-click: hold to rotate camera, quick-click to command zombies / deselect
 local zm_wasZM = false
+hook.Add("GUIMouseReleased", "ZM_MouseRelease", function(mouseCode, aimVector)
+    local ply = LocalPlayer()
+    if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+
+    if mouseCode == MOUSE_RIGHT and zm_rightMouseHeld then
+        zm_rightMouseHeld = false
+        
+        if zm_cameraRotating then
+            gui.EnableScreenClicker(true)
+            zm_cameraRotating = false
+        end
+
+        local holdTime = RealTime() - zm_rightMouseStartTime
+        if holdTime <= 0.15 and #ZM_LocalData.selectedZombies > 0 then
+            local tr = ZM_GetCursorTrace(ply)
+            
+            if tr.Hit then
+                net.Start("ZM_CommandZombies")
+                    net.WriteVector(tr.HitPos)
+                    net.WriteEntity(tr.Entity)
+                    local validZombies = {}
+                    for _, npc in ipairs(ZM_LocalData.selectedZombies) do
+                        if IsValid(npc) then table.insert(validZombies, npc) end
+                    end
+                    net.WriteUInt(#validZombies, 8)
+                    for _, npc in ipairs(validZombies) do
+                        net.WriteEntity(npc)
+                    end
+                net.SendToServer()
+            end
+        elseif #ZM_LocalData.selectedZombies == 0 and holdTime <= 0.15 then
+            -- Quick click with no zombies deselects power
+            ZM_LocalData.currentPower = nil
+            ZM_LocalData.spawnType = nil
+        end
+    end
+end)
+
 hook.Add("Think", "ZM_RightClickCamera", function()
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
@@ -323,47 +411,19 @@ hook.Add("Think", "ZM_RightClickCamera", function()
 
     local rightDown = input.IsMouseDown(MOUSE_RIGHT)
 
-    if rightDown and not zm_rightMouseHeld then
-        -- Right mouse just pressed
-        zm_rightMouseHeld = true
-        zm_rightMouseStartTime = RealTime()
-        zm_rightMouseMoved = false
-        -- Disable cursor so mouse controls camera rotation
-        gui.EnableScreenClicker(false)
-    elseif rightDown and zm_rightMouseHeld then
-        -- Still holding right mouse - check if we've moved enough to count as drag
-        if (RealTime() - zm_rightMouseStartTime) > 0.15 then
-            zm_rightMouseMoved = true
+    if rightDown and #ZM_LocalData.selectedZombies > 0 and zm_rightMouseHeld then
+        local holdTime = RealTime() - zm_rightMouseStartTime
+        if holdTime > 0.15 and not zm_cameraRotating then
+            zm_cameraRotating = true
+            gui.EnableScreenClicker(false)
         end
     elseif not rightDown and zm_rightMouseHeld then
-        -- Right mouse just released
+        -- Native fallback: if the mouse is physically released but we didn't catch it
+        -- (because drawing contexts were disabled), we forcibly release it here.
         zm_rightMouseHeld = false
-        -- Re-enable cursor for ZM GUI
-        gui.EnableScreenClicker(true)
-
-        -- If it was a quick click (not a drag), perform command action
-        if not zm_rightMouseMoved then
-            local tr = ZM_GetCursorTrace(ply)
-            if tr.Hit then
-                if #ZM_LocalData.selectedZombies > 0 then
-                    -- Command selected zombies to move
-                    net.Start("ZM_CommandZombies")
-                        net.WriteVector(tr.HitPos)
-                        local validZombies = {}
-                        for _, npc in ipairs(ZM_LocalData.selectedZombies) do
-                            if IsValid(npc) then table.insert(validZombies, npc) end
-                        end
-                        net.WriteUInt(#validZombies, 8)
-                        for _, npc in ipairs(validZombies) do
-                            net.WriteEntity(npc)
-                        end
-                    net.SendToServer()
-                else
-                    -- Deselect power/spawn type
-                    ZM_LocalData.currentPower = nil
-                    ZM_LocalData.spawnType = nil
-                end
-            end
+        if zm_cameraRotating then
+            gui.EnableScreenClicker(true)
+            zm_cameraRotating = false
         end
     end
 end)

@@ -58,10 +58,31 @@ net.Receive("ZM_BuyItem", function(len, ply)
                 -- Refund
                 ply:SetNWInt("ZM_Money", currentMoney)
             else
-                ply:Give(weaponId)
-                if weaponData.ammo then
-                    ply:GiveAmmo(weaponData.ammoCount or 30, weaponData.ammo, true)
+                local wepTbl = weapons.Get(weaponId) or weapons.GetStored(weaponId)
+                local newSlot = wepTbl and wepTbl.Slot or 2 -- Assume primary if unknown
+                local isMelee = (weaponData.category == "Cuerpo a cuerpo")
+                
+                if not isMelee then
+                    -- Strip existing weapon in the same slot
+                    for _, wep in ipairs(ply:GetWeapons()) do
+                        local wClass = wep:GetClass()
+                        if wClass ~= "weapon_crowbar" and wClass ~= "weapon_physcannon" then
+                            local oldWepTbl = weapons.Get(wClass) or weapons.GetStored(wClass)
+                            local oldSlot = oldWepTbl and oldWepTbl.Slot or 2
+                            
+                            -- Slot <= 1 means pistol, Slot >= 2 means primary rifle/shotgun etc
+                            if (newSlot <= 1 and oldSlot <= 1) or (newSlot > 1 and oldSlot > 1) then
+                                ply:StripWeapon(wClass)
+                            end
+                        end
+                    end
                 end
+                
+                local newWep = ply:Give(weaponId)
+                if IsValid(newWep) then
+                    ply:SetAmmo(0, newWep:GetPrimaryAmmoType())
+                end
+                
                 ZM_Notify(ply, "Purchased " .. weaponData.name .. " for $" .. price, Color(100, 255, 100))
             end
         end

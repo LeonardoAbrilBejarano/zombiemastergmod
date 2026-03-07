@@ -16,6 +16,12 @@ function ZM_GiveLoadout(ply)
 
     -- Always give crowbar (melee backup)
     ply:Give("weapon_crowbar")
+    
+    -- Give default pistol
+    local pistol = ply:Give("arc9_eft_pm")
+    if IsValid(pistol) then
+        ply:SetAmmo(0, pistol:GetPrimaryAmmoType())
+    end
 
     -- Set health and armor
     ply:SetHealth(ZM_CONFIG.SURVIVOR_HP)

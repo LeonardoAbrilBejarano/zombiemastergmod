@@ -268,14 +268,24 @@ net.Receive("ZM_CommandZombies", function(len, ply)
     if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
 
     local targetPos = net.ReadVector()
+    local targetEnt = net.ReadEntity()
     local numZombies = net.ReadUInt(8)
 
     for i = 1, numZombies do
         local npc = net.ReadEntity()
         if IsValid(npc) and npc:IsNPC() and npc.zmOwner == ply then
-            -- Set the NPC's schedule to walk to position
-            npc:SetLastPosition(targetPos)
-            npc:SetSchedule(SCHED_FORCED_GO_RUN)
+            if IsValid(targetEnt) and targetEnt:IsPlayer() and targetEnt:Team() == TEAM_SURVIVORS and targetEnt:Alive() then
+                -- Set the NPC's enemy to the clicked survivor
+                npc:SetLastPosition(targetPos)
+                npc:SetTarget(targetEnt)
+                npc:SetEnemy(targetEnt)
+                npc:UpdateEnemyMemory(targetEnt, targetPos)
+                npc:SetSchedule(SCHED_TARGET_CHASE)
+            else
+                -- Generic walk to position
+                npc:SetLastPosition(targetPos)
+                npc:SetSchedule(SCHED_FORCED_GO_RUN)
+            end
         end
     end
 end)
