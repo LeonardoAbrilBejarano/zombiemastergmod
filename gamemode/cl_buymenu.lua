@@ -163,16 +163,3 @@ concommand.Add("zm_buymenu", function(ply, cmd, args)
     ZM_OpenBuyMenu()
 end)
 
--- Bind "B" key for buy menu intercepting normal game loop hooks isn't robust,
--- Better to hook PlayerBindPress
-hook.Add("PlayerBindPress", "ZM_BuyMenuBind", function(ply, bind, pressed)
-    if not pressed then return end
-    if bind:find("gm_showspare1") then -- F3
-        RunConsoleCommand("zm_buymenu")
-        return true
-    elseif bind:find("slot") or bind:find("menu") then
-        -- You could optionally map standard B key if needed,
-        -- but many users type B in chat etc.
-        -- Often better to use F3 or bind "b" "zm_buymenu" in console explicitly.
-    end
-end)

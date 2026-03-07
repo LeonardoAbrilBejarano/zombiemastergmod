@@ -306,9 +306,20 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
 end)
 
 -- Right-click: hold to rotate camera, quick-click to command zombies / deselect
+local zm_wasZM = false
 hook.Add("Think", "ZM_RightClickCamera", function()
     local ply = LocalPlayer()
-    if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+    if not IsValid(ply) then return end
+
+    local isZM = (ply:Team() == TEAM_ZM)
+    
+    if zm_wasZM and not isZM then
+        gui.EnableScreenClicker(false)
+        zm_rightMouseHeld = false
+    end
+    zm_wasZM = isZM
+
+    if not isZM then return end
 
     local rightDown = input.IsMouseDown(MOUSE_RIGHT)
 

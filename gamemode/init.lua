@@ -12,6 +12,7 @@ AddCSLuaFile("cl_zmhud.lua")
 AddCSLuaFile("cl_teamselect.lua")
 AddCSLuaFile("cl_scoreboard.lua")
 AddCSLuaFile("cl_objectives.lua")
+AddCSLuaFile("cl_buymenu.lua")
 
 -- Load shared
 include("shared.lua")

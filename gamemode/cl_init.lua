@@ -18,12 +18,6 @@ function GM:Initialize()
     -- Initialize HUD elements if needed
 end
 
--- Hook F3 to optionally open the buy menu if they press it
-function GM:ShowSpare1()
-    if LocalPlayer():Team() == TEAM_SURVIVORS then
-        RunConsoleCommand("zm_buymenu")
-    end
-end
 
 -- Local state
 ZM_LocalData = {

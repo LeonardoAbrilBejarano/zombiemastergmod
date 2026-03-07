@@ -69,3 +69,10 @@ net.Receive("ZM_BuyItem", function(len, ply)
         ZM_Notify(ply, "Not enough money! Need $" .. price, Color(255, 100, 100))
     end
 end)
+
+-- Hook F3 (ShowSpare1) to open the buy menu
+hook.Add("ShowSpare1", "ZM_OpenBuyMenu_F3", function(ply)
+    if IsValid(ply) and ply:Team() == TEAM_SURVIVORS then
+        ply:ConCommand("zm_buymenu")
+    end
+end)
