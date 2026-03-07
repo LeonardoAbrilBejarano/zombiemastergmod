@@ -42,7 +42,7 @@ end)
 function ZM_DrawMoney(ply, w, h)
     local money = ply:GetNWInt("ZM_Money", 0)
     local x = 20
-    local y = h - 100 -- Above health
+    local y = h - 140 -- Above all the bars (Health, Armor, Stamina)
     
     draw.RoundedBox(4, x - 2, y - 2, 120, 34, Color(0, 0, 0, 180))
     draw.SimpleText("$" .. money, "ZM_HUDLarge", x + 10, y + 5, Color(100, 255, 100), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
@@ -86,6 +86,20 @@ function ZM_DrawHealthBar(ply, w, h)
         draw.RoundedBox(2, x, y, barW * armorFrac, armorBarH, Color(50, 120, 220))
         draw.SimpleText(armor .. " Armor", "ZM_Small", x + barW / 2, y + armorBarH / 2, Color(255, 255, 255, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end
+    
+    -- Stamina bar
+    local stamina = ply:GetNWFloat("ZM_Stamina", 100)
+    y = y - 20
+    local staminaBarH = 12
+    draw.RoundedBox(4, x - 2, y - 2, barW + 4, staminaBarH + 4, Color(0, 0, 0, 180))
+
+    local staminaFrac = math.Clamp(stamina / 100, 0, 1)
+    local stamColor = Color(200, 150, 40)
+    if staminaFrac < 0.25 then
+        stamColor = Color(220, 50, 30) -- red when almost exhausted
+    end
+    draw.RoundedBox(2, x, y, barW * staminaFrac, staminaBarH, stamColor)
+    draw.SimpleText(math.Round(stamina) .. "% Stamina", "ZM_Small", x + barW / 2, y + staminaBarH / 2, Color(255, 255, 255, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end
 
 -- Ammo display

@@ -14,6 +14,7 @@ AddCSLuaFile("cl_scoreboard.lua")
 AddCSLuaFile("cl_objectives.lua")
 AddCSLuaFile("cl_buymenu.lua")
 AddCSLuaFile("cl_mapvote.lua")
+AddCSLuaFile("cl_stamina.lua")
 
 -- Load shared
 include("shared.lua")
@@ -26,6 +27,7 @@ include("sv_loadout.lua")
 include("sv_objectives.lua")
 include("sv_buymenu.lua")
 include("sv_mapvote.lua")
+include("sv_stamina.lua")
 
 --[[---------------------------------------------------------
     Gamemode Initialization
@@ -88,8 +90,9 @@ function GM:PlayerSpawn(ply)
     ply:AllowFlashlight(true)
 
     -- Set speed
-    ply:SetWalkSpeed(200)
-    ply:SetRunSpeed(300)
+    ply:SetWalkSpeed(130)
+    ply:SetRunSpeed(210)
+    ply:SetNWFloat("ZM_Stamina", 100)
     
     -- Set starting money
     if not ply:GetNWInt("ZM_Money") or ply:GetNWInt("ZM_Money") == 0 then
