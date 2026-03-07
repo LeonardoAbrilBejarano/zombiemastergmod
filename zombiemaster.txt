@@ -1,0 +1,7 @@
+"zombiemaster"
+{
+	"title"		"Zombie Master"
+	"base"		"base"
+	"author"	"Custom"
+	"menusystem"	"1"
+}
