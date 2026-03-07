@@ -13,6 +13,7 @@ AddCSLuaFile("cl_teamselect.lua")
 AddCSLuaFile("cl_scoreboard.lua")
 AddCSLuaFile("cl_objectives.lua")
 AddCSLuaFile("cl_buymenu.lua")
+AddCSLuaFile("cl_mapvote.lua")
 
 -- Load shared
 include("shared.lua")
@@ -24,6 +25,7 @@ include("sv_powers.lua")
 include("sv_loadout.lua")
 include("sv_objectives.lua")
 include("sv_buymenu.lua")
+include("sv_mapvote.lua")
 
 --[[---------------------------------------------------------
     Gamemode Initialization
@@ -306,3 +308,11 @@ function GM:PlayerShouldTakeDamage(ply, attacker)
     end
     return true
 end
+
+--[[---------------------------------------------------------
+    Override F2 (ShowTeam)
+-----------------------------------------------------------]]
+function GM:ShowTeam(ply)
+    ZM_SendMapVote(ply)
+end
+

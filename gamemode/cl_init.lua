@@ -10,6 +10,7 @@ include("cl_teamselect.lua")
 include("cl_scoreboard.lua")
 include("cl_objectives.lua")
 include("cl_buymenu.lua")
+include("cl_mapvote.lua")
 
 -- GMod Base missing font for death notices
 surface.CreateFont("HL2MPTypeDeath", {
