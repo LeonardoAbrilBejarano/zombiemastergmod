@@ -222,11 +222,65 @@ ZM_MISSIONS["subway"] = {
 }
 
 -- ============================================================
+-- MISSION 5: CUSTOM BATTERY SURVIVAL
+-- Specifically designed for the downloaded workshop map
+-- ============================================================
+ZM_MISSIONS["custom_battery_survival"] = {
+    name = "Power Restoration",
+    description = "Find the 3 hidden batteries, deliver them to the spawn, and survive for 3 minutes!",
+    icon = "icon16/lightning.png",
+    objectives = {
+        {
+            id = "find_batteries",
+            description = "Find 3 batteries scattered around the map",
+            type = "pickup",
+            itemClass = "ent_zm_objective_item",
+            itemModel = "models/items/car_battery01.mdl",
+            itemName = "Battery",
+            requiredCount = 3,
+            collected = 0,
+            -- EDIT THESE VECTORS TO YOUR EXACT COORDINATES WITH THE getpos COMMAND
+            absoluteSpawnPos = {
+                Vector(-903.963684, -342.429047, 202.516098),
+                Vector(-1219.185059, -2682.500000, 492.031250),
+                Vector(4957.332520, 1190.500977, 448.031250)
+            },
+        },
+        {
+            id = "deliver_batteries",
+            description = "Bring the batteries back to the generator at spawn",
+            type = "interact",
+            interactModel = "models/props_vehicles/generatortrailer01.mdl",
+            interactName = "Generator",
+            interactPrompt = "Press E to install batteries",
+            -- EDIT THIS VECTOR TO YOUR EXACT SPAWN/DELIVERY COORDINATE WITH THE getpos COMMAND
+            absoluteSpawnPos = Vector(3456.766113, -1844.450684, 384.031250),
+        },
+        {
+            id = "survive_3_mins",
+            description = "Defend the area for 3 minutes! (180 seconds)",
+            type = "survive",
+            surviveTime = 180,
+        },
+    },
+    -- Spawn points for survivors in this specific mission
+    playerSpawns = {
+        Vector(3456.766113, -1844.450684, 384.031250),
+    }
+}
+
+-- ============================================================
 -- MISSION SYSTEM FUNCTIONS
 -- ============================================================
 
 -- Start a mission (called at round start)
 function ZM_StartMission(missionId)
+    -- OVERRIDE: Check if we are playing on the specific map
+    -- EDIT "zm_mapname" TO THE NAME OF THE WORKSHOP MAP YOU DOWNLOADED
+    if game.GetMap() == "hns_mallparking_short" then
+        missionId = "custom_battery_survival"
+    end
+
     local missionDef = ZM_MISSIONS[missionId]
     if not missionDef then
         -- Pick a random mission
@@ -284,17 +338,29 @@ function ZM_SpawnObjectiveEntities(obj, basePos, objIndex)
     if obj.type == "pickup" then
         -- Spawn collectible items
         local offsets = obj.spawnOffset or {}
-        for j, offset in ipairs(offsets) do
-            local spawnPos = basePos + offset
+        local absPosList = obj.absoluteSpawnPos or {}
+        local count = math.max(#offsets, #absPosList)
 
-            -- Trace down to find ground
-            local tr = util.TraceLine({
-                start = spawnPos + Vector(0, 0, 200),
-                endpos = spawnPos - Vector(0, 0, 500),
-                mask = MASK_SOLID_BRUSHONLY,
-            })
-            if tr.Hit then
-                spawnPos = tr.HitPos + Vector(0, 0, 10)
+        for j = 1, count do
+            local spawnPos
+            if absPosList[j] then
+                spawnPos = absPosList[j]
+            elseif offsets[j] then
+                spawnPos = basePos + offsets[j]
+            end
+            
+            if not spawnPos then continue end
+
+            -- Only trace down for relative offsets, not absolute getpos vectors
+            if not absPosList[j] then
+                local tr = util.TraceLine({
+                    start = spawnPos + Vector(0, 0, 200),
+                    endpos = spawnPos - Vector(0, 0, 500),
+                    mask = MASK_SOLID_BRUSHONLY,
+                })
+                if tr.Hit then
+                    spawnPos = tr.HitPos + Vector(0, 0, 10)
+                end
             end
 
             local item = ents.Create("ent_zm_objective_item")
@@ -315,15 +381,17 @@ function ZM_SpawnObjectiveEntities(obj, basePos, objIndex)
         end
     elseif obj.type == "interact" then
         -- Spawn interaction point
-        local spawnPos = basePos + (obj.spawnOffset or Vector(0, 0, 20))
+        local spawnPos = obj.absoluteSpawnPos or (basePos + (obj.spawnOffset or Vector(0, 0, 20)))
 
-        local tr = util.TraceLine({
-            start = spawnPos + Vector(0, 0, 200),
-            endpos = spawnPos - Vector(0, 0, 500),
-            mask = MASK_SOLID_BRUSHONLY,
-        })
-        if tr.Hit then
-            spawnPos = tr.HitPos + Vector(0, 0, 5)
+        if not obj.absoluteSpawnPos then
+            local tr = util.TraceLine({
+                start = spawnPos + Vector(0, 0, 200),
+                endpos = spawnPos - Vector(0, 0, 500),
+                mask = MASK_SOLID_BRUSHONLY,
+            })
+            if tr.Hit then
+                spawnPos = tr.HitPos + Vector(0, 0, 5)
+            end
         end
 
         local interact = ents.Create("ent_zm_objective_interact")
@@ -341,15 +409,17 @@ function ZM_SpawnObjectiveEntities(obj, basePos, objIndex)
         end
     elseif obj.type == "reach" then
         -- Spawn a reach zone marker
-        local spawnPos = basePos + (obj.spawnOffset or Vector(0, 0, 20))
+        local spawnPos = obj.absoluteSpawnPos or (basePos + (obj.spawnOffset or Vector(0, 0, 20)))
 
-        local tr = util.TraceLine({
-            start = spawnPos + Vector(0, 0, 200),
-            endpos = spawnPos - Vector(0, 0, 500),
-            mask = MASK_SOLID_BRUSHONLY,
-        })
-        if tr.Hit then
-            spawnPos = tr.HitPos + Vector(0, 0, 5)
+        if not obj.absoluteSpawnPos then
+            local tr = util.TraceLine({
+                start = spawnPos + Vector(0, 0, 200),
+                endpos = spawnPos - Vector(0, 0, 500),
+                mask = MASK_SOLID_BRUSHONLY,
+            })
+            if tr.Hit then
+                spawnPos = tr.HitPos + Vector(0, 0, 5)
+            end
         end
 
         local zone = ents.Create("ent_zm_objective_interact")

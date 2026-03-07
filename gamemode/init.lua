@@ -92,6 +92,20 @@ function GM:PlayerSpawn(ply)
     if not ply:GetNWInt("ZM_Money") or ply:GetNWInt("ZM_Money") == 0 then
         ply:SetNWInt("ZM_Money", ZM_CONFIG.STARTING_MONEY)
     end
+
+    -- Custom round/mission spawn routing
+    if ZM_Mission and ZM_Mission.active then
+        local missionDef = ZM_MISSIONS[ZM_Mission.missionId]
+        if missionDef and missionDef.playerSpawns and #missionDef.playerSpawns > 0 then
+            -- Delay slightly to ensure standard engine spawns don't override this
+            timer.Simple(0.1, function()
+                if IsValid(ply) and ply:Alive() and ply:Team() == TEAM_SURVIVORS then
+                    local spawnPos = missionDef.playerSpawns[math.random(#missionDef.playerSpawns)]
+                    ply:SetPos(spawnPos)
+                end
+            end)
+        end
+    end
 end
 
 --[[---------------------------------------------------------
