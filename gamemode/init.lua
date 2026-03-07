@@ -81,6 +81,9 @@ function GM:PlayerSpawn(ply)
     -- Give weapons
     ZM_GiveLoadout(ply)
 
+    -- Enable flashlight
+    ply:AllowFlashlight(true)
+
     -- Set speed
     ply:SetWalkSpeed(200)
     ply:SetRunSpeed(300)
@@ -164,6 +167,17 @@ end
 -----------------------------------------------------------]]
 function GM:GetFallDamage(ply, speed)
     return speed / 8 -- Moderate fall damage
+end
+
+--[[---------------------------------------------------------
+    Flashlight
+-----------------------------------------------------------]]
+function GM:PlayerSwitchFlashlight(ply, SwitchOn)
+    -- Only allow survivors to use flashlights
+    if ply:Team() == TEAM_SURVIVORS then
+        return true
+    end
+    return false
 end
 
 --[[---------------------------------------------------------
