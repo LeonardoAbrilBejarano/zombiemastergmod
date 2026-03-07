@@ -171,37 +171,7 @@ end
 
 -- Crosshair for ZM
 function ZM_DrawCrosshair(w, h)
-    local cx, cy = w / 2, h / 2
-    local size = 12
-    local col = Color(255, 50, 50, 180)
-
-    if ZM_LocalData.currentPower == "physexplode" then
-        col = Color(255, 140, 30, 200)
-        size = 16
-    elseif ZM_LocalData.currentPower == "spotcreate" then
-        col = Color(100, 200, 100, 200)
-        size = 16
-    elseif ZM_LocalData.spawnType then
-        col = Color(255, 255, 100, 200)
-        size = 14
-    end
-
-    surface.SetDrawColor(col)
-    surface.DrawLine(cx - size, cy, cx + size, cy)
-    surface.DrawLine(cx, cy - size, cx, cy + size)
-
-    -- Circle
-    local segments = 16
-    for i = 0, segments - 1 do
-        local a1 = (i / segments) * math.pi * 2
-        local a2 = ((i + 1) / segments) * math.pi * 2
-        surface.DrawLine(
-            cx + math.cos(a1) * size * 1.5,
-            cy + math.sin(a1) * size * 1.5,
-            cx + math.cos(a2) * size * 1.5,
-            cy + math.sin(a2) * size * 1.5
-        )
-    end
+    -- User specifically requested to remove the central crosshair
 end
 
 -- Helper function to get world trace from mouse cursor
@@ -237,6 +207,11 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
     if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
 
     if mouseCode == MOUSE_RIGHT then
+        -- Cancel drag selection if starting a right-click action
+        if zm_isDragSelecting then
+            zm_isDragSelecting = false
+        end
+        
         zm_rightMouseHeld = true
         zm_rightMouseStartTime = RealTime()
         zm_cameraRotating = false
@@ -277,6 +252,8 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
     if ZM_HandlePowerPanelClick(mx, my) then return end
 
     if mouseCode == MOUSE_LEFT then
+        if zm_rightMouseHeld then return end -- Block left clicks if right-click action is active
+        
         if ZM_LocalData.currentPower then
             -- Use power at target location
             local tr = ZM_GetCursorTrace(ply)
