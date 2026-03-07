@@ -66,15 +66,15 @@ ZM_WEAPONS = {
     { id = "weapon_crowbar",    name = "Crowbar",       category = "melee", price = 0 },
 
     -- EFT ARC9 Pistols
-    { id = "arc9_eft_glock17",  name = "Glock 17",      category = "Pistols", price = 200, ammo = "Pistol", ammoCount = 72 },
-    { id = "arc9_eft_m1911a1",  name = "M1911A1",       category = "Pistols", price = 300, ammo = "Pistol", ammoCount = 72 },
-    { id = "arc9_eft_m9a3",     name = "M9A3",          category = "Pistols", price = 400, ammo = "Pistol", ammoCount = 72 },
-    { id = "arc9_eft_deagle",   name = "Desert Eagle",  category = "Pistols", price = 650, ammo = "357",    ammoCount = 21 },
+    { id = "arc9_eft_glock17",  name = "Glock 17",      category = "Pistolas", price = 200, ammo = "Pistol", ammoCount = 72 },
+    { id = "arc9_eft_m1911a1",  name = "M1911A1",       category = "Pistolas", price = 300, ammo = "Pistol", ammoCount = 72 },
+    { id = "arc9_eft_m9a3",     name = "M9A3",          category = "Pistolas", price = 400, ammo = "Pistol", ammoCount = 72 },
+    { id = "arc9_eft_deagle",   name = "Desert Eagle",  category = "Pistolas", price = 650, ammo = "357",    ammoCount = 21 },
     
     -- Other
-    { id = "weapon_smg1",       name = "SMG",           category = "SMGs",    price = 1000, ammo = "SMG1", ammoCount = 120 },
-    { id = "weapon_shotgun",    name = "Shotgun",       category = "Heavy",   price = 1200, ammo = "Buckshot", ammoCount = 24 },
-    { id = "weapon_ar2",        name = "Rifle",         category = "Rifles",  price = 2000, ammo = "AR2", ammoCount = 60 },
+    { id = "weapon_smg1",       name = "SMG",           category = "Subfusiles",    price = 1000, ammo = "SMG1", ammoCount = 120 },
+    { id = "weapon_shotgun",    name = "Shotgun",       category = "Escopetas",   price = 1200, ammo = "Buckshot", ammoCount = 24 },
+    { id = "weapon_ar2",        name = "Rifle",         category = "Fusiles de asalto",  price = 2000, ammo = "AR2", ammoCount = 60 },
 }
 
 -- Network strings (registered on server)
@@ -100,3 +100,102 @@ if SERVER then
     util.AddNetworkString("ZM_ObjectiveUpdate")
     util.AddNetworkString("ZM_BuyItem")
 end
+
+--[[---------------------------------------------------------
+    Dynamic ARC9 EFT Weapon Loader
+    Automatically scans installed weapons and adds EFT weapons
+    to the Survivor Buy Menu (F3) with calculated prices.
+-----------------------------------------------------------]]
+hook.Add("InitPostEntity", "ZM_LoadEFTWeapons", function()
+    local allWeapons = weapons.GetList()
+    local addedCount = 0
+
+    for _, wep in ipairs(allWeapons) do
+        local class = wep.ClassName
+
+        -- Only process EFT ARC9 weapons
+        if class and string.match(class, "^arc9_eft_") then
+            -- Avoid adding existing weapons manually defined above
+            local alreadyExists = false
+            for _, existing in ipairs(ZM_WEAPONS) do
+                if existing.id == class then
+                    alreadyExists = true
+                    break
+                end
+            end
+
+            if not alreadyExists then
+                local name = wep.PrintName or class
+                local wepCategory = wep.Category or ""
+                local subCategory = wep.SubCategory or ""
+                
+                local shopCat = "Other"
+                local price = 1000
+                local ammo = "SMG1"
+                local ammoCount = 60
+
+                local catLower = string.lower(wepCategory .. " " .. subCategory .. " " .. class)
+                
+                -- Determine shop category, price, and ammo type based on the SWEP Category
+                if string.find(catLower, "pistol") or string.find(catLower, "pistola") then
+                    shopCat = "Pistolas"
+                    price = 400
+                    ammo = "Pistol"
+                    ammoCount = 72
+                elseif string.find(catLower, "smg") or string.find(catLower, "submachine") or string.find(catLower, "subfusil") then
+                    shopCat = "Subfusiles"
+                    price = 1000
+                    ammo = "SMG1"
+                    ammoCount = 120
+                elseif string.find(catLower, "shotgun") or string.find(catLower, "escopeta") then
+                    shopCat = "Escopetas"
+                    price = 1200
+                    ammo = "Buckshot"
+                    ammoCount = 24
+                elseif string.find(catLower, "sniper") or string.find(catLower, "marksman") or string.find(catLower, "francotirador") or string.find(catLower, "tirador") then
+                    shopCat = "Fusiles de francotirador & Fusiles de tirador designado"
+                    price = 2500
+                    ammo = "357" -- Default strong ammo for snipers
+                    ammoCount = 20
+                elseif string.find(catLower, "carbine") or string.find(catLower, "carabina") then
+                    shopCat = "Carabinas de asalto"
+                    price = 1500
+                    ammo = "AR2"
+                    ammoCount = 60
+                elseif string.find(catLower, "assault") or string.find(catLower, "asalto") or string.find(catLower, "rifle") then
+                    shopCat = "Fusiles de asalto"
+                    price = 1800
+                    ammo = "AR2"
+                    ammoCount = 90
+                elseif string.find(catLower, "machine gun") or string.find(catLower, "lmg") or string.find(catLower, "ametralladora") then
+                    shopCat = "Ametralladoras Ligeras"
+                    price = 3000
+                    ammo = "AR2"
+                    ammoCount = 200
+                elseif string.find(catLower, "explosive") or string.find(catLower, "grenade") or string.find(catLower, "granada") then
+                    shopCat = "Granadas & Lanzagranadas"
+                    price = 800
+                    ammo = "Grenade"
+                    ammoCount = 1
+                elseif string.find(catLower, "melee") or string.find(catLower, "cuerpo") then
+                    shopCat = "Cuerpo a cuerpo"
+                    price = 500
+                else
+                    shopCat = (subCategory ~= "") and subCategory or "Otros"
+                end
+
+                -- Add to global ZM weapons table
+                table.insert(ZM_WEAPONS, {
+                    id = class,
+                    name = name,
+                    category = shopCat,
+                    price = price,
+                    ammo = ammo,
+                    ammoCount = ammoCount
+                })
+                addedCount = addedCount + 1
+            end
+        end
+    end
+    print("[ZM] Dynamically loaded " .. addedCount .. " EFT weapons into the Buy Menu.")
+end)

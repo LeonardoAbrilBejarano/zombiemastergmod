@@ -76,15 +76,34 @@ function ZM_OpenBuyMenu()
             itemCard:SetPos(0, yPos)
             itemCard.weaponData = w
             
-            itemCard.Paint = function(self, w, h)
-                draw.RoundedBox(4, 0, 0, w, h, Color(40, 40, 45, 200))
+            -- Always try to use DImage with 'entities/classname.png' for icons
+            local iconMat = Material("entities/" .. w.id .. ".png", "smooth")
+            if not iconMat:IsError() then
+                local icon = vgui.Create("DImage", itemCard)
+                icon:SetSize(64, 64)
+                icon:SetPos(10, 8)
+                icon:SetMaterial(iconMat)
+            else
+                -- Fallback to SpawnIcon if DImage material is not found
+                local sweptable = weapons.GetStored(w.id) or weapons.Get(w.id)
+                if sweptable and sweptable.WorldModel and sweptable.WorldModel ~= "" then
+                    local icon = vgui.Create("SpawnIcon", itemCard)
+                    icon:SetSize(64, 64)
+                    icon:SetPos(10, 8)
+                    icon:SetModel(sweptable.WorldModel)
+                    icon:SetTooltip(false)
+                end
+            end
+            
+            itemCard.Paint = function(self, bw, bh)
+                draw.RoundedBox(4, 0, 0, bw, bh, Color(40, 40, 45, 200))
                 
                 local canAfford = LocalPlayer():GetNWInt("ZM_Money", 0) >= self.weaponData.price
                 local col = canAfford and Color(255, 255, 255) or Color(150, 150, 150)
                 local priceCol = canAfford and Color(100, 255, 100) or Color(255, 100, 100)
                 
-                draw.SimpleText(self.weaponData.name, "Trebuchet24", 15, h / 2, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-                draw.SimpleText("$" .. self.weaponData.price, "Trebuchet24", w - 150, h / 2, priceCol, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+                draw.SimpleText(self.weaponData.name, "Trebuchet24", 85, bh / 2, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                draw.SimpleText("$" .. self.weaponData.price, "Trebuchet24", bw - 150, bh / 2, priceCol, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
             end
             
             local buyWeaponBtn = vgui.Create("DButton", itemCard)
