@@ -9,6 +9,21 @@ include("cl_zmhud.lua")
 include("cl_teamselect.lua")
 include("cl_scoreboard.lua")
 include("cl_objectives.lua")
+include("cl_buymenu.lua")
+
+--[[---------------------------------------------------------
+    Initialize Client Systems
+-----------------------------------------------------------]]
+function GM:Initialize()
+    -- Initialize HUD elements if needed
+end
+
+-- Hook F3 to optionally open the buy menu if they press it
+function GM:ShowSpare1()
+    if LocalPlayer():Team() == TEAM_SURVIVORS then
+        RunConsoleCommand("zm_buymenu")
+    end
+end
 
 -- Local state
 ZM_LocalData = {

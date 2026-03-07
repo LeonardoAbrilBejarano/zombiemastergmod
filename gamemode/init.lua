@@ -22,6 +22,7 @@ include("sv_zm.lua")
 include("sv_powers.lua")
 include("sv_loadout.lua")
 include("sv_objectives.lua")
+include("sv_buymenu.lua")
 
 --[[---------------------------------------------------------
     Gamemode Initialization
@@ -83,6 +84,11 @@ function GM:PlayerSpawn(ply)
     -- Set speed
     ply:SetWalkSpeed(200)
     ply:SetRunSpeed(300)
+    
+    -- Set starting money
+    if not ply:GetNWInt("ZM_Money") or ply:GetNWInt("ZM_Money") == 0 then
+        ply:SetNWInt("ZM_Money", ZM_CONFIG.STARTING_MONEY)
+    end
 end
 
 --[[---------------------------------------------------------

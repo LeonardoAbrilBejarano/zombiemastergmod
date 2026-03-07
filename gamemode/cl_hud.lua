@@ -30,9 +30,23 @@ hook.Add("HUDPaint", "ZM_SurvivorHUD", function()
 
     -- Ammo display
     ZM_DrawAmmo(ply, w, h)
+    
+    -- Money / Economy display
+    ZM_DrawMoney(ply, w, h)
 
     -- Round info
     ZM_DrawRoundInfo(w, h)
+end
+
+-- Money display
+function ZM_DrawMoney(ply, w, h)
+    local money = ply:GetNWInt("ZM_Money", 0)
+    local x = 20
+    local y = h - 100 -- Above health
+    
+    draw.RoundedBox(4, x - 2, y - 2, 120, 34, Color(0, 0, 0, 180))
+    draw.SimpleText("$" .. money, "ZM_HUDLarge", x + 10, y + 5, Color(100, 255, 100), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+    draw.SimpleText("F3 to Buy", "ZM_Small", x + 10, y - 20, Color(255, 255, 255, 180), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
 end)
 
 -- Health bar

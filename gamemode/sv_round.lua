@@ -5,6 +5,7 @@
 
 local roundState = ROUND_WAITING
 local roundTimer = 0
+local roundHadZM = false
 local zmVolunteers = {}
 
 -- Get current round state
@@ -57,6 +58,21 @@ end
 
 -- Select the Zombie Master
 function ZM_SelectZM()
+    local eligible_players = 0
+    for _, ply in ipairs(player.GetAll()) do
+        if ply:Team() ~= TEAM_SPECTATOR and ply:Team() ~= TEAM_UNASSIGNED then
+            eligible_players = eligible_players + 1
+        end
+    end
+
+    -- If there's less than 2 players, allow them to play solo as Survivor without forcing ZM
+    if eligible_players < 2 then
+        for _, ply in ipairs(player.GetAll()) do
+            if ply:Team() == TEAM_ZM then return ply end
+        end
+        return nil
+    end
+
     local candidates = {}
 
     -- Check volunteers first
@@ -106,7 +122,15 @@ function ZM_StartRound()
 
     -- Select ZM
     local zmPlayer = ZM_SelectZM()
-    if not zmPlayer then
+    
+    local activePlayers = 0
+    for _, ply in ipairs(player.GetAll()) do
+        if ply:Team() ~= TEAM_SPECTATOR and ply:Team() ~= TEAM_UNASSIGNED then
+            activePlayers = activePlayers + 1
+        end
+    end
+    
+    if activePlayers == 0 then
         ZM_NotifyAll("Not enough players to start a round!", Color(255, 100, 100))
         return
     end
@@ -136,15 +160,21 @@ function ZM_StartRound()
         net.WriteFloat(roundTimer)
     net.Broadcast()
 
-    ZM_NotifyAll("Round started! " .. zmPlayer:Nick() .. " is the Zombie Master!", Color(255, 60, 60))
-
-    -- Start resource regeneration
-    timer.Create("ZM_ResourceRegen", ZM_CONFIG.RESOURCE_REGEN_RATE, 0, function()
-        if ZM_GetRoundState() ~= ROUND_ACTIVE then return end
-        local zm = ZM_GetZMPlayer()
-        if not IsValid(zm) then return end
-        ZM_AddResources(zm, ZM_CONFIG.RESOURCE_REGEN)
-    end)
+    if IsValid(zmPlayer) then
+        roundHadZM = true
+        ZM_NotifyAll("Round started! " .. zmPlayer:Nick() .. " is the Zombie Master!", Color(255, 60, 60))
+        
+        -- Start resource regeneration
+        timer.Create("ZM_ResourceRegen", ZM_CONFIG.RESOURCE_REGEN_RATE, 0, function()
+            if ZM_GetRoundState() ~= ROUND_ACTIVE then return end
+            local zm = ZM_GetZMPlayer()
+            if not IsValid(zm) then return end
+            ZM_AddResources(zm, ZM_CONFIG.RESOURCE_REGEN)
+        end)
+    else
+        roundHadZM = false
+        ZM_NotifyAll("Round started! No Zombie Master present, survive against the horde!", Color(60, 255, 60))
+    end
 
     -- Start a random mission
     timer.Simple(2, function()
@@ -213,7 +243,7 @@ function ZM_CheckRoundEnd()
 
     -- Check if ZM disconnected
     local zm = ZM_GetZMPlayer()
-    if not IsValid(zm) then
+    if not IsValid(zm) and roundHadZM then
         ZM_EndRound(false, "The Zombie Master has left!")
         return
     end

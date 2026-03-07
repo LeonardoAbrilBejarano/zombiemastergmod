@@ -55,16 +55,26 @@ ZM_CONFIG = {
     SURVIVOR_HP         = 100,
     SURVIVOR_ARMOR      = 50,
     ZM_MOVE_SPEED       = 800,      -- ZM overhead camera speed
+    -- Economy
+    STARTING_MONEY      = 3000,
+    KILL_REWARD         = 100,
 }
 
--- Weapon definitions for loadout
+-- Weapon definitions for loadout / buy menu
 ZM_WEAPONS = {
-    { id = "weapon_pistol",     name = "Pistol",        category = "small",     ammo = "Pistol",    ammoCount = 72 },
-    { id = "weapon_357",        name = "Revolver",      category = "small",     ammo = "357",       ammoCount = 18 },
-    { id = "weapon_smg1",       name = "SMG",           category = "large",     ammo = "SMG1",      ammoCount = 120 },
-    { id = "weapon_shotgun",    name = "Shotgun",       category = "large",     ammo = "Buckshot",  ammoCount = 24 },
-    { id = "weapon_ar2",        name = "Rifle",         category = "large",     ammo = "AR2",       ammoCount = 60 },
-    { id = "weapon_crowbar",    name = "Crowbar",       category = "melee" },
+    -- Melee
+    { id = "weapon_crowbar",    name = "Crowbar",       category = "melee", price = 0 },
+
+    -- EFT ARC9 Pistols
+    { id = "arc9_eft_glock17",  name = "Glock 17",      category = "Pistols", price = 200, ammo = "Pistol", ammoCount = 72 },
+    { id = "arc9_eft_m1911a1",  name = "M1911A1",       category = "Pistols", price = 300, ammo = "Pistol", ammoCount = 72 },
+    { id = "arc9_eft_m9a3",     name = "M9A3",          category = "Pistols", price = 400, ammo = "Pistol", ammoCount = 72 },
+    { id = "arc9_eft_deagle",   name = "Desert Eagle",  category = "Pistols", price = 650, ammo = "357",    ammoCount = 21 },
+    
+    -- Other
+    { id = "weapon_smg1",       name = "SMG",           category = "SMGs",    price = 1000, ammo = "SMG1", ammoCount = 120 },
+    { id = "weapon_shotgun",    name = "Shotgun",       category = "Heavy",   price = 1200, ammo = "Buckshot", ammoCount = 24 },
+    { id = "weapon_ar2",        name = "Rifle",         category = "Rifles",  price = 2000, ammo = "AR2", ammoCount = 60 },
 }
 
 -- Network strings (registered on server)
@@ -88,4 +98,5 @@ if SERVER then
     util.AddNetworkString("ZM_VolunteerZM")
     util.AddNetworkString("ZM_OpenSpawnMenu")
     util.AddNetworkString("ZM_ObjectiveUpdate")
+    util.AddNetworkString("ZM_BuyItem")
 end

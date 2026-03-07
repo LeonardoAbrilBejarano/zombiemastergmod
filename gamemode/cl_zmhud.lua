@@ -531,24 +531,7 @@ hook.Add("InputMouseApply", "ZM_ShowCursor", function(cmd, x, y, angle)
     end
 end)
 
--- Disable cursor when not ZM
-hook.Add("Think", "ZM_CursorControl", function()
-    local ply = LocalPlayer()
-    if not IsValid(ply) then return end
 
-    if ply:Team() == TEAM_ZM then
-        -- Don't re-enable cursor while right-click is held (camera rotation mode)
-        if zm_rightMouseHeld then return end
-
-        if not vgui.CursorVisible() then
-            gui.EnableScreenClicker(true)
-        end
-    else
-        if vgui.CursorVisible() and not IsValid(zm_panel) then
-            gui.EnableScreenClicker(false)
-        end
-    end
-end)
 
 -- Draw selected zombie highlights in the world
 hook.Add("PostDrawOpaqueRenderables", "ZM_HighlightZombies", function()
