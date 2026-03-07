@@ -18,6 +18,9 @@ net.Receive("ZM_ObjectiveUpdate", function()
     local current = net.ReadUInt(4)
     ZM_ObjData.current = current
     ZM_ObjData.objectives = {}
+    
+    -- If count is 0, the mission is disabled/cleared
+    if count == 0 then return end
 
     for i = 1, count do
         local obj = {

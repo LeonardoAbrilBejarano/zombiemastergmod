@@ -275,8 +275,11 @@ ZM_MISSIONS["custom_battery_survival"] = {
 
 -- Start a mission (called at round start)
 function ZM_StartMission(missionId)
+    local theMap = string.lower(game.GetMap())
+    print("DEBUG ZM_StartMission MAP NAME CHECK:", theMap)
+    
     -- Disable custom missions on specific maps that have their own integrated missions
-    if string.lower(game.GetMap()) == "zm_docksoftthedead" then
+    if string.find(theMap, "docksofthedead", 1, true) then
         ZM_NotifyAll("Playing on official ZM map: Custom objectives disabled.", Color(150, 150, 150))
         ZM_CleanupMission()
         return
@@ -585,7 +588,7 @@ end
 function ZM_CleanupMission()
     ZM_Mission.active = false
 
-    for _, ent in ipairs(ZM_Mission.items) do
+    for _, ent in ipairs(ents.FindByClass("ent_zm_objective_*")) do
         if IsValid(ent) then ent:Remove() end
     end
     ZM_Mission.items = {}
