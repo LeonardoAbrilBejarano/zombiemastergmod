@@ -250,6 +250,19 @@ function ZM_DrawCrosshair(w, h)
     end
 end
 
+-- Helper function to get world trace from mouse cursor
+function ZM_GetCursorTrace(ply)
+    local mx, my = gui.MousePos()
+    local aimVec = gui.ScreenToVector(mx, my)
+    if not aimVec then aimVec = ply:GetAimVector() end
+    
+    return util.TraceLine({
+        start = ply:EyePos(),
+        endpos = ply:EyePos() + (aimVec * 10000),
+        filter = ply
+    })
+end
+
 -- Track right-click camera dragging state
 local zm_rightMouseHeld = false
 local zm_rightMouseStartTime = 0
@@ -267,7 +280,7 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
     if ZM_HandlePowerPanelClick(mx, my) then return end
 
     -- World click (spawn zombie, use power, or select zombie)
-    local tr = ply:GetEyeTrace()
+    local tr = ZM_GetCursorTrace(ply)
     if not tr.Hit then return end
 
     if mouseCode == MOUSE_LEFT then
@@ -319,7 +332,7 @@ hook.Add("Think", "ZM_RightClickCamera", function()
 
         -- If it was a quick click (not a drag), perform command action
         if not zm_rightMouseMoved then
-            local tr = ply:GetEyeTrace()
+            local tr = ZM_GetCursorTrace(ply)
             if tr.Hit then
                 if #ZM_LocalData.selectedZombies > 0 then
                     -- Command selected zombies to move
@@ -473,7 +486,7 @@ hook.Add("PlayerBindPress", "ZM_Binds", function(ply, bind, pressed)
 
     -- R for rally all
     if bind == "+reload" then
-        local tr = ply:GetEyeTrace()
+        local tr = ZM_GetCursorTrace(ply)
         if tr.Hit then
             net.Start("ZM_SetRally")
                 net.WriteVector(tr.HitPos)
