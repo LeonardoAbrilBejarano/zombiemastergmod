@@ -250,7 +250,7 @@ function ZM_OverBansheeLimit()
     if limit <= 0 then return false end
 
     local survivorCount = ZM_CountTeam(TEAM_SURVIVORS)
-    local maxBanshees = math.ceil(limit * survivorCount)
+    local maxBanshees = math.max(5, math.ceil(limit * survivorCount))
 
     local currentBanshees = 0
     for _, npc in ipairs(ents.GetAll()) do

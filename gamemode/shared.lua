@@ -31,7 +31,7 @@ ZM_CONFIG = {
 
     -- Population
     MAX_ZOMBIES         = 50,       -- Maximum zombie population
-    BANSHEE_LIMIT       = 0.5,      -- Max banshees = players * this value
+    BANSHEE_LIMIT       = 5,        -- Max banshees = players * this value
 
     -- Spawn
     SPAWN_DELAY         = 0.75,     -- Seconds between zombie spawns from a single point
