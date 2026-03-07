@@ -12,13 +12,8 @@ function ENT:Initialize()
     self:PhysicsInit(SOLID_VPHYSICS)
     self:SetMoveType(MOVETYPE_NONE)
     self:SetSolid(SOLID_NONE)
-    
-    -- Crucial: Render mode needs to support transparency, and color must be 0 auth to hide it from humans
-    -- Client script (cl_init.lua) will override drawing for the ZM player using Sprites
-    self:SetRenderMode(RENDERMODE_TRANSALPHA)
-    self:SetColor(Color(255, 255, 255, 0))
     self:DrawShadow(false)
-
+    
     -- Network variables
     self:SetNWBool("Active", true)
     self:SetNWString("SpawnName", "Zombie Spawn")
@@ -90,31 +85,74 @@ function ENT:SpawnThink()
 end
 
 function ENT:FindValidSpawnPoint()
-    local pos = self:GetPos()
-    local attempts = 25
-
-    for i = 1, attempts do
-        local testPos = pos + Vector(
-            math.random(-128, 128),
-            math.random(-128, 128),
-            0
-        )
-
-        local tr = util.TraceHull({
-            start = testPos + Vector(0, 0, 10),
-            endpos = testPos + Vector(0, 0, 1),
-            mins = Vector(-16, -16, 0),
-            maxs = Vector(16, 16, 72),
-            mask = MASK_NPCSOLID,
-        })
-
-        if not tr.Hit then
-            return testPos
+    local hoverOrigin = self:GetPos()
+    
+    -- First, project the center point straight down to the absolute floor
+    local centerDownTr = util.TraceLine({
+        start = hoverOrigin + Vector(0,0,10),
+        endpos = hoverOrigin - Vector(0,0,500),
+        mask = MASK_SOLID_BRUSHONLY
+    })
+    
+    local floorOrigin = centerDownTr.Hit and centerDownTr.HitPos or hoverOrigin
+    
+    local offsets = {0, 40, 80, 120, 160}
+    
+    for _, r in ipairs(offsets) do
+        local points = (r == 0) and 1 or 8
+        local startAngle = math.random(0, 359)
+        local step = 360 / points
+        
+        for deg = 0, 359, step do
+            local rad = math.rad(startAngle + deg)
+            -- Calculate test position on the horizontal plane of the FLOOR
+            local testPos = floorOrigin + Vector(math.cos(rad) * r, math.sin(rad) * r, 0)
+            
+            local isValid = true
+            
+            -- Prevent spawning inside or behind walls by checking line of sight
+            -- We trace from slightly above the floor to avoid tiny bumps
+            if r > 0 then
+                local wallTr = util.TraceLine({
+                    start = floorOrigin + Vector(0,0,20),
+                    endpos = testPos + Vector(0,0,20),
+                    mask = MASK_SOLID_BRUSHONLY
+                })
+                if wallTr.Hit then
+                    isValid = false
+                end
+            end
+            
+            if isValid then
+                -- Must use BRUSHONLY for the downward trace to ignore NPC heads and prevent vertical stacking
+                -- Trace from slightly higher in case of stairs/ramps
+                local downTr = util.TraceLine({
+                    start = testPos + Vector(0,0,50),
+                    endpos = testPos - Vector(0,0,200),
+                    mask = MASK_SOLID_BRUSHONLY
+                })
+                
+                local finalPos = downTr.Hit and downTr.HitPos or testPos
+                
+                -- Check if an NPC can physically fit in this exact spot
+                -- endpos MUST be the same as start, or very close, otherwise it's a sweep trace that hits ceilings
+                local hullTr = util.TraceHull({
+                    start = finalPos + Vector(0,0,2),
+                    endpos = finalPos + Vector(0,0,3),
+                    mins = Vector(-16, -16, 0),
+                    maxs = Vector(16, 16, 70),
+                    mask = MASK_NPCSOLID
+                })
+                
+                if not hullTr.Hit then
+                    return finalPos + Vector(0,0,2) -- Return with slight Z bump to prevent stuck-in-floor
+                end
+            end
         end
     end
 
-    -- Fallback to entity position
-    return pos + Vector(0, 0, 10)
+    -- Absolute fallback
+    return floorOrigin + Vector(0, 0, 10)
 end
 
 function ENT:Think()
