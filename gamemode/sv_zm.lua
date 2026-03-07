@@ -51,6 +51,7 @@ end
 function ZM_AddResources(ply, amount)
     if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
     ply.zmResources = math.min((ply.zmResources or 0) + amount, ZM_CONFIG.MAX_RESOURCES)
+    ply:PrintMessage(HUD_PRINTCONSOLE, "ZM_AddResources TICK: " .. amount .. " New total: " .. ply.zmResources)
     ZM_SyncResources(ply)
 end
 
