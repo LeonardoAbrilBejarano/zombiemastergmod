@@ -21,6 +21,8 @@ function ENT:DrawTranslucent()
 
     local active = self:GetNWBool("Active", true)
     if not active then return end
+    
+    if self:GetNWBool("MapHidden", false) then return end
 
     local pos = self:GetPos()
 

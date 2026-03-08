@@ -655,6 +655,13 @@ function ZM_CleanupMission()
     timer.Remove("ZM_SurviveTimer")
     timer.Remove("ZM_SurviveCountdown")
     
+    -- Reset all native map traps so they can be interacted with again in the new round
+    for _, ent in ipairs(ents.FindByClass("info_manipulate")) do
+        if IsValid(ent) and ent.ResetTrap then
+            ent:ResetTrap()
+        end
+    end
+    
     ZM_SyncObjectives()
 end
 

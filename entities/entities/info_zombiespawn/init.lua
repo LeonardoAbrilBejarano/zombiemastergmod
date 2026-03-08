@@ -38,20 +38,30 @@ function ENT:KeyValue(key, value)
         self.rallyName = tostring(value)
     elseif lkey == "startactive" then
         self:SetNWBool("Active", tobool(value))
-    elseif lkey == "zombietype" then
-        self.zombieType = tonumber(value) or 1
+    elseif lkey == "map_zombietype" then
+        self.mapZombieType = tostring(value)
+    elseif lkey == "map_maxcount" then
+        self.mapMaxCount = tonumber(value) or 1
+    elseif lkey == "map_hidden" then
+        self:SetNWBool("MapHidden", tobool(value))
     end
 end
 
 function ENT:AcceptInput(inputName, activator, caller, data)
     local linput = string.lower(inputName)
-    print("DEBUG info_zombiespawn Received Input:", inputName, "Data:", tostring(data), "Caller:", tostring(caller))
     
-    if linput == "spawnzombie" then
-        local typeToSpawn = tonumber(data)
-        if not typeToSpawn or typeToSpawn == 0 then
-            typeToSpawn = self.zombieType
+    if linput == "enable" or linput == "spawn" then
+        local typeToSpawn = self.mapZombieType or "shambler"
+        local count = self.mapMaxCount or 1
+        for i = 1, count do
+            self:QueueZombie(typeToSpawn)
         end
+        return true
+    elseif linput == "disable" then
+        return true
+    elseif linput == "spawnzombie" then
+        local typeToSpawn = tostring(data)
+        if typeToSpawn == "" then typeToSpawn = "shambler" end
         
         self:QueueZombie(typeToSpawn)
         self:TriggerOutput("OnSpawnZombie", activator)
@@ -109,16 +119,11 @@ function ENT:SpawnThink()
     local typeId = table.remove(self.spawnQueue, 1)
     local zm = ZM_GetZMPlayer and ZM_GetZMPlayer() or nil
     
-    print("DEBUG info_zombiespawn SpawnThink popping! Queue size:", #self.spawnQueue, "Type ID:", typeId, "ZM Player:", tostring(zm))
-
-    -- As a fallback, if there's no ZM player, we'll still spawn it but unowned 
-    -- so that map traps still work when testing alone as a survivor
     local ztype = ZM_ZOMBIE_BY_ID[typeId]
     if ztype then
         local spawnPos = self:FindValidSpawnPoint()
         if spawnPos then
             -- Note: We modified ZM_SpawnZombie in sv_zm.lua, we should make sure it accepts a nil ZM player
-            print("DEBUG info_zombiespawn: Proceeding to spawn zombie type", ztype.class, "at", tostring(spawnPos))
             local npc = ZM_SpawnZombie(zm, ztype, spawnPos)
             if IsValid(npc) then
                 npc:SetOwner(self)
@@ -131,14 +136,9 @@ function ENT:SpawnThink()
                         npc:SetSchedule(SCHED_FORCED_GO_RUN)
                     end
                 end
-            else
-                print("DEBUG info_zombiespawn: ZM_SpawnZombie returned nil/invalid!")
+                end
             end
-        else
-            print("DEBUG info_zombiespawn: No valid spawn point found around entity!")
         end
-    else
-        print("DEBUG info_zombiespawn: Invalid zombie type ID:", typeId)
     end
 
     -- Schedule next spawn

@@ -24,7 +24,7 @@ include("sh_zombietypes.lua")
 -- Shared configuration
 ZM_CONFIG = {
     -- Resource system
-    START_RESOURCES     = 150,
+    START_RESOURCES     = 999,
     MAX_RESOURCES       = 999,
     RESOURCE_REGEN      = 3,        -- Resources gained per tick
     RESOURCE_REGEN_RATE = 1,        -- Seconds between regen ticks
