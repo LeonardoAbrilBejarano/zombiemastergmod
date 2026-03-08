@@ -5,6 +5,7 @@
 
 ENT.Type = "anim"
 ENT.Base = "base_anim"
+ENT.Outputs = {"OnSpawnZombie"}
 
 ENT.PrintName    = "Zombie Spawn Point"
 ENT.Category     = "Zombie Master"

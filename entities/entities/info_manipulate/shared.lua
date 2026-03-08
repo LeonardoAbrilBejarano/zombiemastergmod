@@ -5,6 +5,7 @@
 
 ENT.Type = "anim"
 ENT.Base = "base_anim"
+ENT.Outputs = {"OnPressed", "OnTrigger"}
 
 ENT.PrintName    = "ZM Manipulate"
 ENT.Category     = "Zombie Master"

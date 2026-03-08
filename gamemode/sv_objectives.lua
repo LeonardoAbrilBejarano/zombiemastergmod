@@ -331,6 +331,11 @@ function ZM_StartMission(missionId)
     -- Make sure map spawns exist or refresh them
     ZM_SpawnMapSpawnPoints(theMap)
     
+    -- Restore purged Half-Life 2 map zombie makers
+    if ZM_RunMapRestorer then
+        ZM_RunMapRestorer()
+    end
+    
     -- Disable custom missions on specific maps that have their own integrated missions
     if string.find(theMap, "docksofthedead", 1, true) then
         ZM_NotifyAll("Playing on official ZM map: Custom objectives disabled.", Color(150, 150, 150))

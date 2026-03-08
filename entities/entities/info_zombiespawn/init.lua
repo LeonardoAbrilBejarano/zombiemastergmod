@@ -20,6 +20,7 @@ function ENT:Initialize()
 
     -- Map properties
     self.rallyName = ""
+    self.zombieType = 1
 
     -- Spawn queue
     self.spawnQueue = {}
@@ -31,12 +32,42 @@ function ENT:KeyValue(key, value)
     if string.Left(lkey, 2) == "on" then
         self:StoreOutput(key, value)
     elseif lkey == "targetname" then
+        self:SetName(tostring(value))
         self:SetNWString("SpawnName", tostring(value))
     elseif lkey == "rallyname" then
         self.rallyName = tostring(value)
     elseif lkey == "startactive" then
         self:SetNWBool("Active", tobool(value))
+    elseif lkey == "zombietype" then
+        self.zombieType = tonumber(value) or 1
     end
+end
+
+function ENT:AcceptInput(inputName, activator, caller, data)
+    local linput = string.lower(inputName)
+    print("DEBUG info_zombiespawn Received Input:", inputName, "Data:", tostring(data), "Caller:", tostring(caller))
+    
+    if linput == "spawnzombie" then
+        local typeToSpawn = tonumber(data)
+        if not typeToSpawn or typeToSpawn == 0 then
+            typeToSpawn = self.zombieType
+        end
+        
+        self:QueueZombie(typeToSpawn)
+        self:TriggerOutput("OnSpawnZombie", activator)
+        return true
+    elseif linput == "turnon" then
+        self:SetNWBool("Active", true)
+        return true
+    elseif linput == "turnoff" then
+        self:SetNWBool("Active", false)
+        return true
+    elseif linput == "toggle" then
+        self:SetNWBool("Active", not self:GetNWBool("Active", true))
+        return true
+    end
+    
+    return false
 end
 
 function ENT:Reset()
@@ -77,28 +108,37 @@ function ENT:SpawnThink()
 
     local typeId = table.remove(self.spawnQueue, 1)
     local zm = ZM_GetZMPlayer and ZM_GetZMPlayer() or nil
+    
+    print("DEBUG info_zombiespawn SpawnThink popping! Queue size:", #self.spawnQueue, "Type ID:", typeId, "ZM Player:", tostring(zm))
 
-    if IsValid(zm) then
-        local ztype = ZM_ZOMBIE_BY_ID[typeId]
-        if ztype then
-            -- Find valid spawn position near this entity
-            local spawnPos = self:FindValidSpawnPoint()
-            if spawnPos then
-                local npc = ZM_SpawnZombie(zm, ztype, spawnPos)
-                if IsValid(npc) then
-                    npc:SetOwner(self)
-                    
-                    -- Native map rally points
-                    if self.rallyName and self.rallyName ~= "" then
-                        local rallyents = ents.FindByName(self.rallyName)
-                        if #rallyents > 0 and IsValid(rallyents[1]) then
-                            npc:SetLastPosition(rallyents[1]:GetPos())
-                            npc:SetSchedule(SCHED_FORCED_GO_RUN)
-                        end
+    -- As a fallback, if there's no ZM player, we'll still spawn it but unowned 
+    -- so that map traps still work when testing alone as a survivor
+    local ztype = ZM_ZOMBIE_BY_ID[typeId]
+    if ztype then
+        local spawnPos = self:FindValidSpawnPoint()
+        if spawnPos then
+            -- Note: We modified ZM_SpawnZombie in sv_zm.lua, we should make sure it accepts a nil ZM player
+            print("DEBUG info_zombiespawn: Proceeding to spawn zombie type", ztype.class, "at", tostring(spawnPos))
+            local npc = ZM_SpawnZombie(zm, ztype, spawnPos)
+            if IsValid(npc) then
+                npc:SetOwner(self)
+                
+                -- Native map rally points
+                if self.rallyName and self.rallyName ~= "" then
+                    local rallyents = ents.FindByName(self.rallyName)
+                    if #rallyents > 0 and IsValid(rallyents[1]) then
+                        npc:SetLastPosition(rallyents[1]:GetPos())
+                        npc:SetSchedule(SCHED_FORCED_GO_RUN)
                     end
                 end
+            else
+                print("DEBUG info_zombiespawn: ZM_SpawnZombie returned nil/invalid!")
             end
+        else
+            print("DEBUG info_zombiespawn: No valid spawn point found around entity!")
         end
+    else
+        print("DEBUG info_zombiespawn: Invalid zombie type ID:", typeId)
     end
 
     -- Schedule next spawn

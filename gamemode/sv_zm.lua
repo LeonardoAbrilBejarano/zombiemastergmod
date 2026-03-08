@@ -3,6 +3,11 @@
     Server-side: handles ZM's overhead camera, resources, population, zombie commands
 ]]
 
+include("shared.lua")
+include("sv_map_restorer.lua") -- Parses BSP to resurrect deleted Half-Life 2 map spawns
+include("sv_objectives.lua")
+include("sv_buymenu.lua")
+
 -- Set up a player as the Zombie Master
 function ZM_SetupZMPlayer(ply)
     ply:SetTeam(TEAM_ZM)
