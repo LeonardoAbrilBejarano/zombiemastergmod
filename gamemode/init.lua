@@ -20,6 +20,7 @@ AddCSLuaFile("cl_stamina.lua")
 include("shared.lua")
 
 -- Load server-side systems
+include("sv_workshop.lua")
 include("sv_round.lua")
 include("sv_zm.lua")
 include("sv_powers.lua")
