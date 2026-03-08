@@ -11,6 +11,7 @@ function ENT:Draw()
 
     -- Only visible to ZM
     if ply:Team() ~= TEAM_ZM then return end
+    if self:GetNWBool("IsUsed", false) then return end
 
     local active = self:GetNWBool("Active", true)
     local pos = self:GetPos()

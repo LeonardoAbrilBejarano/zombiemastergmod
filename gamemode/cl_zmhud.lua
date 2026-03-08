@@ -331,7 +331,7 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
             local clickedTrap = nil
             
             for _, ent in ipairs(ents.FindByClass("info_zombiespawn")) do
-                if IsValid(ent) and ent:GetNWBool("Active", true) then
+                if IsValid(ent) and ent:GetNWBool("Active", true) and not ent:GetNWBool("MapHidden", false) then
                     local hitPos = util.IntersectRayWithSphere(eyePos, aimVec, ent:GetPos(), 64)
                     if hitPos then
                         clickedSpawn = ent
@@ -346,7 +346,7 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
             end
 
             for _, ent in ipairs(ents.FindByClass("info_manipulate")) do
-                if IsValid(ent) and ent:GetNWBool("Active", true) then
+                if IsValid(ent) and ent:GetNWBool("Active", true) and not ent:GetNWBool("IsUsed", false) then
                     local hitPos = util.IntersectRayWithSphere(eyePos, aimVec, ent:GetPos(), 32)
                     if hitPos then
                         clickedTrap = ent

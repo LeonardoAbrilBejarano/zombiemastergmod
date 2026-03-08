@@ -20,6 +20,7 @@ function ENT:Initialize()
 
     -- Map properties
     self.rallyName = ""
+    self.zombieType = 1
 
     -- Spawn queue
     self.spawnQueue = {}
@@ -31,12 +32,52 @@ function ENT:KeyValue(key, value)
     if string.Left(lkey, 2) == "on" then
         self:StoreOutput(key, value)
     elseif lkey == "targetname" then
+        self:SetName(tostring(value))
         self:SetNWString("SpawnName", tostring(value))
     elseif lkey == "rallyname" then
         self.rallyName = tostring(value)
     elseif lkey == "startactive" then
         self:SetNWBool("Active", tobool(value))
+    elseif lkey == "map_zombietype" then
+        self.mapZombieType = tostring(value)
+    elseif lkey == "map_maxcount" then
+        self.mapMaxCount = tonumber(value) or 1
+    elseif lkey == "map_hidden" then
+        self:SetNWBool("MapHidden", tobool(value))
     end
+end
+
+function ENT:AcceptInput(inputName, activator, caller, data)
+    local linput = string.lower(inputName)
+    
+    if linput == "enable" or linput == "spawn" then
+        local typeToSpawn = self.mapZombieType or "shambler"
+        local count = self.mapMaxCount or 1
+        for i = 1, count do
+            self:QueueZombie(typeToSpawn)
+        end
+        return true
+    elseif linput == "disable" then
+        return true
+    elseif linput == "spawnzombie" then
+        local typeToSpawn = tostring(data)
+        if typeToSpawn == "" then typeToSpawn = "shambler" end
+        
+        self:QueueZombie(typeToSpawn)
+        self:TriggerOutput("OnSpawnZombie", activator)
+        return true
+    elseif linput == "turnon" then
+        self:SetNWBool("Active", true)
+        return true
+    elseif linput == "turnoff" then
+        self:SetNWBool("Active", false)
+        return true
+    elseif linput == "toggle" then
+        self:SetNWBool("Active", not self:GetNWBool("Active", true))
+        return true
+    end
+    
+    return false
 end
 
 function ENT:Reset()
@@ -77,25 +118,24 @@ function ENT:SpawnThink()
 
     local typeId = table.remove(self.spawnQueue, 1)
     local zm = ZM_GetZMPlayer and ZM_GetZMPlayer() or nil
-
-    if IsValid(zm) then
-        local ztype = ZM_ZOMBIE_BY_ID[typeId]
-        if ztype then
-            -- Find valid spawn position near this entity
-            local spawnPos = self:FindValidSpawnPoint()
-            if spawnPos then
-                local npc = ZM_SpawnZombie(zm, ztype, spawnPos)
-                if IsValid(npc) then
-                    npc:SetOwner(self)
-                    
-                    -- Native map rally points
-                    if self.rallyName and self.rallyName ~= "" then
-                        local rallyents = ents.FindByName(self.rallyName)
-                        if #rallyents > 0 and IsValid(rallyents[1]) then
-                            npc:SetLastPosition(rallyents[1]:GetPos())
-                            npc:SetSchedule(SCHED_FORCED_GO_RUN)
-                        end
+    
+    local ztype = ZM_ZOMBIE_BY_ID[typeId]
+    if ztype then
+        local spawnPos = self:FindValidSpawnPoint()
+        if spawnPos then
+            -- Note: We modified ZM_SpawnZombie in sv_zm.lua, we should make sure it accepts a nil ZM player
+            local npc = ZM_SpawnZombie(zm, ztype, spawnPos)
+            if IsValid(npc) then
+                npc:SetOwner(self)
+                
+                -- Native map rally points
+                if self.rallyName and self.rallyName ~= "" then
+                    local rallyents = ents.FindByName(self.rallyName)
+                    if #rallyents > 0 and IsValid(rallyents[1]) then
+                        npc:SetLastPosition(rallyents[1]:GetPos())
+                        npc:SetSchedule(SCHED_FORCED_GO_RUN)
                     end
+                end
                 end
             end
         end
