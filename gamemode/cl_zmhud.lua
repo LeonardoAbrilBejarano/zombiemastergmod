@@ -301,29 +301,75 @@ local zm_spawnMenu = nil
 function ZM_OpenSpawnMenu(spawnEnt)
     if IsValid(zm_spawnMenu) then zm_spawnMenu:Remove() end
 
+    -- Base frame size and positioning
     local p = vgui.Create("DFrame")
-    p:SetSize(400, 350)
-    p:SetTitle("Spawn Zombies - " .. (spawnEnt:GetNWString("SpawnName", "Spawn Area")))
-    p:Center()
+    p:SetSize(350, 420)
+    p:SetTitle("") -- Hide default title
+    p:ShowCloseButton(false) -- Hide default close button
+    -- Align to the left side of the screen, vertically centered (ScrH/2 - half window height)
+    p:SetPos(30, ScrH() / 2 - 210)
     p:MakePopup()
     
+    -- Custom DFrame Painting (matching the ZM Powers UI box)
+    p.Paint = function(self, w, h)
+        -- Main dark translucent background
+        draw.RoundedBox(6, 0, 0, w, h, Color(20, 20, 30, 220))
+        -- Header highlight
+        draw.RoundedBoxEx(6, 0, 0, w, 35, Color(30, 30, 45, 240), true, true, false, false)
+        
+        -- Header text
+        draw.SimpleText("ZM POWERS", "ZM_HUDSmall", w/2, 17, Color(255, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        
+        -- Subheader (Spawn name)
+        draw.SimpleText(spawnEnt:GetNWString("SpawnName", "Spawn Area"), "ZM_Small", w/2, 45, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    end
+    
+    -- Custom close button in top right
+    local closeBtn = vgui.Create("DButton", p)
+    closeBtn:SetSize(24, 24)
+    closeBtn:SetPos(p:GetWide() - 30, 5)
+    closeBtn:SetText("X")
+    closeBtn:SetTextColor(Color(200, 100, 100))
+    closeBtn.Paint = function() end -- No background
+    closeBtn.DoClick = function() p:Close() end
+
     local scroll = vgui.Create("DScrollPanel", p)
+    -- Dock with margin to clear our custom header
     scroll:Dock(FILL)
+    scroll:DockMargin(10, 50, 10, 10)
 
     for i, ztype in ipairs(ZM_ZOMBIE_TYPES) do
         local btn = scroll:Add("DButton")
-        btn:SetText(ztype.name .. " (Cost: " .. ztype.cost .. " / Pop: " .. ztype.popCost .. ")")
+        btn:SetText("") -- Clear default text, we draw our own
         btn:Dock(TOP)
-        btn:DockMargin(5, 5, 5, 0)
-        btn:SetTall(40)
+        btn:DockMargin(0, 2, 0, 2)
+        btn:SetTall(42)
+        
+        btn.Paint = function(self, w, h)
+            local canAfford = (ZM_LocalData.resources or 0) >= ztype.cost and ((ZM_LocalData.population or 0) + ztype.popCost) <= (ZM_LocalData.maxPop or 50)
+            
+            -- Hover color state
+            local bgCol = self:IsHovered() and Color(40, 40, 55, 240) or Color(30, 30, 45, 220)
+            if not canAfford then
+                bgCol = self:IsHovered() and Color(60, 30, 30, 240) or Color(40, 20, 20, 220)
+            end
+            
+            draw.RoundedBox(4, 0, 0, w, h, bgCol)
+            
+            -- Name (centered, upper half)
+            local nameCol = canAfford and Color(100, 255, 100) or Color(200, 100, 100)
+            draw.SimpleText(ztype.name, "ZM_Medium", w / 2, 4, nameCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+            
+            -- Costs (centered, lower half)
+            draw.SimpleText("Cost: " .. ztype.cost .. " / Pop: " .. ztype.popCost, "ZM_Small", w / 2, 23, Color(180, 180, 180), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        end
+        
         btn.DoClick = function()
             if (ZM_LocalData.resources or 0) >= ztype.cost and ((ZM_LocalData.population or 0) + ztype.popCost) <= (ZM_LocalData.maxPop or 50) then
                 net.Start("ZM_SpawnZombie")
                     net.WriteString(ztype.id)
                     net.WriteUInt(spawnEnt:EntIndex(), 16)
                 net.SendToServer()
-                -- Do not close menu automatically so they can spam it, unless we want to?
-                -- p:Close()
             else
                 surface.PlaySound("buttons/button10.wav")
             end
