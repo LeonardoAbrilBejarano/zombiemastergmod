@@ -99,6 +99,7 @@ if SERVER then
     util.AddNetworkString("ZM_OpenSpawnMenu")
     util.AddNetworkString("ZM_ObjectiveUpdate")
     util.AddNetworkString("ZM_BuyItem")
+    util.AddNetworkString("ZM_AutoAttack")
 end
 
 --[[---------------------------------------------------------

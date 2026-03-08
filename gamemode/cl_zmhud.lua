@@ -150,16 +150,24 @@ function ZM_DrawSelectedInfo(w, h)
     end
 
     local panelW = 240
+    local panelH = alive > 0 and 75 or 50
     local x = w / 2 - panelW / 2
-    local y = h - 100
+    local y = h - 20 - panelH
 
-    draw.RoundedBox(6, x, y, panelW, 50, Color(20, 20, 30, 220))
+    draw.RoundedBox(6, x, y, panelW, panelH, Color(20, 20, 30, 220))
     if alive > 0 then
-        draw.SimpleText("Selected: " .. alive .. " zombie" .. (alive ~= 1 and "s" or ""), "ZM_Medium", w / 2, y + 15, Color(255, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        draw.SimpleText("Selected: " .. alive .. " zombie" .. (alive ~= 1 and "s" or ""), "ZM_Medium", w / 2, y + 10, Color(255, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         
-        -- Draw Deselect All button background
-        draw.RoundedBox(4, x + 10, y + 30, panelW - 20, 15, Color(60, 40, 40, 200))
-        draw.SimpleText("Mid-Click to Deselect", "ZM_Small", w / 2, y + 30, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        -- Draw Deselect All button text
+        draw.RoundedBox(4, x + 10, y + 25, panelW - 20, 18, Color(60, 40, 40, 200))
+        draw.SimpleText("Mid-Click to Deselect", "ZM_Small", w / 2, y + 27, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+
+        -- Draw AutoAttack button (Left-Click)
+        local mx, my = gui.MousePos()
+        local aaHovered = (mx >= x + 10 and mx <= x + panelW - 10 and my >= y + 48 and my <= y + 66)
+        local btnCol = aaHovered and Color(150, 40, 40, 200) or Color(100, 40, 40, 200)
+        draw.RoundedBox(4, x + 10, y + 48, panelW - 20, 18, btnCol)
+        draw.SimpleText("Left-Click: Offensive Stance", "ZM_Small", w / 2, y + 50, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
     else
         draw.SimpleText("No zombies selected", "ZM_Medium", w / 2, y + 15, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         
@@ -200,6 +208,24 @@ local zm_cameraRotating = false
 local zm_isDragSelecting = false
 local zm_dragStartX = 0
 local zm_dragStartY = 0
+
+-- Handle clicks on the bottom center panel
+function ZM_HandleBottomPanelClick(mx, my)
+    if not ZM_LocalData.selectedZombies or #ZM_LocalData.selectedZombies == 0 then return false end
+    
+    local panelW = 240
+    local panelH = 75
+    local x = ScrW() / 2 - panelW / 2
+    local y = ScrH() - 20 - panelH
+
+    -- Check auto attack button
+    if mx >= x + 10 and mx <= x + panelW - 10 and my >= y + 48 and my <= y + 66 then
+        net.Start("ZM_AutoAttack")
+        net.SendToServer()
+        return true
+    end
+    return false
+end
 
 -- ZM Mouse input handling (left-click only for GUI actions)
 hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
@@ -250,6 +276,9 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
 
     -- Check if clicking on power panel buttons
     if ZM_HandlePowerPanelClick(mx, my) then return end
+    
+    -- Check if clicking on bottom center panel buttons
+    if ZM_HandleBottomPanelClick(mx, my) then return end
 
     if mouseCode == MOUSE_LEFT then
         if zm_rightMouseHeld then return end -- Block left clicks if right-click action is active

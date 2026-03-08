@@ -272,6 +272,7 @@ net.Receive("ZM_CommandZombies", function(len, ply)
     for i = 1, numZombies do
         local npc = net.ReadEntity()
         if IsValid(npc) and npc:IsNPC() and npc.zmOwner == ply then
+            npc.zmAutoAttack = false -- Explicit command cancels auto-attack
             if IsValid(targetEnt) and targetEnt:IsPlayer() and targetEnt:Team() == TEAM_SURVIVORS and targetEnt:Alive() then
                 -- Set the NPC's enemy to the clicked survivor
                 npc:SetLastPosition(targetPos)
@@ -299,6 +300,70 @@ net.Receive("ZM_SelectZombies", function(len, ply)
         local npc = net.ReadEntity()
         if IsValid(npc) and npc:IsNPC() and npc.zmOwner == ply then
             table.insert(ply.zmSelectedZombies, npc)
+        end
+    end
+end)
+
+-- Handle Auto-Attack command
+net.Receive("ZM_AutoAttack", function(len, ply)
+    if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+
+    local count = 0
+    for _, npc in ipairs(ply.zmSelectedZombies or {}) do
+        if IsValid(npc) and npc:IsNPC() and npc:Health() > 0 then
+            npc.zmAutoAttack = true
+            npc:SetSchedule(SCHED_TARGET_CHASE)
+            count = count + 1
+        end
+    end
+    
+    if count > 0 then
+        ZM_Notify(ply, count .. " zombies in Offensive Stance (Auto-Attack)!", Color(255, 100, 100))
+    end
+end)
+
+-- Auto-Attack AI Loop
+hook.Add("Think", "ZM_AutoAttackAI", function()
+    if not ZM_NextAITick then ZM_NextAITick = 0 end
+    if CurTime() < ZM_NextAITick then return end
+    ZM_NextAITick = CurTime() + 1 -- Update targets every second
+    
+    local survivors = {}
+    for _, ply in ipairs(player.GetAll()) do
+        if ply:Team() == TEAM_SURVIVORS and ply:Alive() then
+            table.insert(survivors, ply)
+        end
+    end
+    
+    if #survivors == 0 then return end
+
+    for _, npc in ipairs(ents.GetAll()) do
+        if IsValid(npc) and npc:IsNPC() and npc.zmOwner and npc.zmAutoAttack and npc:Health() > 0 then
+            -- Find closest survivor
+            local closest = nil
+            local minDist = math.huge
+            local pos = npc:GetPos()
+
+            local enemy = npc:GetEnemy()
+            if not IsValid(enemy) or not enemy:Alive() then
+                for _, s in ipairs(survivors) do
+                    local d = pos:DistToSqr(s:GetPos())
+                    if d < minDist then
+                        minDist = d
+                        closest = s
+                    end
+                end
+                
+                if closest then
+                    npc:SetTarget(closest)
+                    npc:SetEnemy(closest)
+                    npc:UpdateEnemyMemory(closest, closest:GetPos())
+                    npc:SetSchedule(SCHED_TARGET_CHASE)
+                end
+            else
+                -- If they already have an enemy, ensure they keep knowing its position to not lose aggro
+                npc:UpdateEnemyMemory(enemy, enemy:GetPos())
+            end
         end
     end
 end)
