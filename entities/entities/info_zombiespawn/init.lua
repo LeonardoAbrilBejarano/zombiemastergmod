@@ -18,9 +18,25 @@ function ENT:Initialize()
     self:SetNWBool("Active", true)
     self:SetNWString("SpawnName", "Zombie Spawn")
 
+    -- Map properties
+    self.rallyName = ""
+
     -- Spawn queue
     self.spawnQueue = {}
     self.isSpawning = false
+end
+
+function ENT:KeyValue(key, value)
+    local lkey = string.lower(key)
+    if string.Left(lkey, 2) == "on" then
+        self:StoreOutput(key, value)
+    elseif lkey == "targetname" then
+        self:SetNWString("SpawnName", tostring(value))
+    elseif lkey == "rallyname" then
+        self.rallyName = tostring(value)
+    elseif lkey == "startactive" then
+        self:SetNWBool("Active", tobool(value))
+    end
 end
 
 function ENT:Reset()
@@ -69,8 +85,17 @@ function ENT:SpawnThink()
             local spawnPos = self:FindValidSpawnPoint()
             if spawnPos then
                 local npc = ZM_SpawnZombie(zm, ztype, spawnPos)
-                if npc then
+                if IsValid(npc) then
                     npc:SetOwner(self)
+                    
+                    -- Native map rally points
+                    if self.rallyName and self.rallyName ~= "" then
+                        local rallyents = ents.FindByName(self.rallyName)
+                        if #rallyents > 0 and IsValid(rallyents[1]) then
+                            npc:SetLastPosition(rallyents[1]:GetPos())
+                            npc:SetSchedule(SCHED_FORCED_GO_RUN)
+                        end
+                    end
                 end
             end
         end

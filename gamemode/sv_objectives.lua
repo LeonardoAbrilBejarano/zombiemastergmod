@@ -286,54 +286,37 @@ ZM_MAP_SPAWNPOINTS = {
     }
 }
 
--- Generate pre-defined ZM Spawn Points for the map
-function ZM_SpawnMapSpawnPoints()
-    local theMap = string.lower(game.GetMap())
-    
-    -- Cleanup strictly the procedural spawn points first to prevent dupes
-    for _, ent in ipairs(ents.FindByClass("ent_zm_spawnpoint")) do
-        if IsValid(ent) then ent:Remove() end
-    end
-    
-    -- Fuzzy match the map name (e.g. zm_docksofthedead matches docksofthedead)
-    local matchedSpawns = nil
-    for mapKey, spawnList in pairs(ZM_MAP_SPAWNPOINTS) do
-        if string.find(theMap, mapKey, 1, true) then
-            matchedSpawns = spawnList
-            break
+-- We don't need manual custom vectors for spawn points anymore since they are native map entities.
+-- But we can keep ZM_SpawnMapSpawnPoints as a fallback if a map doesn't have any info_zombiespawn entities,
+-- or we can just let the map load them naturally.
+function ZM_SpawnMapSpawnPoints(mapName)
+    -- Update ZM Client about new spawnpoints in case they loaded late
+    for _, ent in ipairs(ents.FindByClass("info_zombiespawn")) do
+        if IsValid(ent) and ent.InitializeZombieStock then
+            ent:InitializeZombieStock()
         end
     end
-    
-    if matchedSpawns then
-        local count = 0
-        for i, spawnData in ipairs(matchedSpawns) do
-            local sp = ents.Create("ent_zm_spawnpoint")
+
+    local count = 0
+    if ZM_MAP_SPAWNPOINTS and ZM_MAP_SPAWNPOINTS[mapName] then
+        for _, spData in ipairs(ZM_MAP_SPAWNPOINTS[mapName]) do
+            local sp = ents.Create("info_zombiespawn")
             if IsValid(sp) then
-                -- Add +15 to Z so they don't clip into the floor
-                sp:SetPos(spawnData.pos + Vector(0, 0, 15))
-                sp:SetAngles(spawnData.ang)
-                sp:SetNWString("SpawnName", "Spawn Area " .. i)
+                sp:SetPos(spData.pos)
+                sp:SetAngles(spData.ang or Angle(0,0,0))
                 sp:Spawn()
-                sp:Activate()
                 count = count + 1
             end
         end
-        print("DEBUG ZM_SpawnMapSpawnPoints: Spawned " .. count .. " ZM spawn points for map " .. theMap)
-        
-        -- Force a sync to the ZM player so they see the new red spheres immediately
-        local zmPly = ZM_GetZMPlayer and ZM_GetZMPlayer() or nil
-        if IsValid(zmPly) then
-            ZM_SyncSpawnPointsToClient(zmPly)
-        end
-    else
-        print("DEBUG ZM_SpawnMapSpawnPoints: No predefined ZM spawn points found for map", theMap)
     end
+    print("DEBUG ZM_SpawnMapSpawnPoints: Fallback spawned " .. count .. " extra ZM spawn points for map " .. tostring(mapName))
 end
 
 -- Spawn them natively as soon as the map logic finishes loading
 hook.Add("InitPostEntity", "ZM_LoadMapSpawns", function()
     timer.Simple(1, function()
-        ZM_SpawnMapSpawnPoints()
+        local theMap = string.lower(game.GetMap())
+        ZM_SpawnMapSpawnPoints(theMap)
     end)
 end)
 
@@ -346,7 +329,7 @@ function ZM_StartMission(missionId)
     print("DEBUG ZM_StartMission MAP NAME CHECK:", theMap)
     
     -- Make sure map spawns exist or refresh them
-    ZM_SpawnMapSpawnPoints()
+    ZM_SpawnMapSpawnPoints(theMap)
     
     -- Disable custom missions on specific maps that have their own integrated missions
     if string.find(theMap, "docksofthedead", 1, true) then
@@ -660,10 +643,7 @@ function ZM_CleanupMission()
         if IsValid(ent) then ent:Remove() end
     end
     
-    -- Remove procedural spawn points
-    for _, ent in ipairs(ents.FindByClass("ent_zm_spawnpoint")) do
-        if IsValid(ent) then ent:Remove() end
-    end
+    print("DEBUG ZM_CleanupMission: Removing old mission items, but preserving native map spawn points")
     
     ZM_Mission.items = {}
 

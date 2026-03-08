@@ -35,6 +35,21 @@ function ENT:DrawTranslucent()
     -- Draw outer aura
     local slowPulse = math.abs(math.sin(CurTime() * 1.5)) * 30 + 100
     render.DrawSprite(pos + Vector(0,0,10), 180, 180, Color(255, 0, 0, slowPulse))
+
+    -- Draw label above
+    local textPos = pos + Vector(0, 0, 40)
+    local ang = (LocalPlayer():GetPos() - textPos):Angle()
+    ang:RotateAroundAxis(ang:Right(), -90)
+    ang:RotateAroundAxis(ang:Up(), 180)
+
+    cam.Start3D2D(textPos, ang, 0.12)
+        local desc = self:GetNWString("SpawnName", "Zombie Spawn")
+
+        local bgColor = Color(100, 30, 30, 200)
+        draw.RoundedBox(8, -250, -30, 500, 60, bgColor)
+
+        draw.SimpleText("🩸 " .. desc, "ZM_Large", 0, 0, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    cam.End3D2D()
 end
 
 -- Override default Draw to ensure it evaluates translucent drawing instead of opaque

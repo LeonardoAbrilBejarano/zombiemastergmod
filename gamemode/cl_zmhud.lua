@@ -330,7 +330,7 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
             local clickedSpawn = nil
             local clickedTrap = nil
             
-            for _, ent in ipairs(ents.FindByClass("ent_zm_spawnpoint")) do
+            for _, ent in ipairs(ents.FindByClass("info_zombiespawn")) do
                 if IsValid(ent) and ent:GetNWBool("Active", true) then
                     local hitPos = util.IntersectRayWithSphere(eyePos, aimVec, ent:GetPos(), 64)
                     if hitPos then

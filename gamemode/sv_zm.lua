@@ -106,7 +106,7 @@ end
 function ZM_SyncSpawnPointsToClient(ply)
     if not IsValid(ply) then return end
 
-    local spawnPoints = ents.FindByClass("ent_zm_spawnpoint")
+    local spawnPoints = ents.FindByClass("info_zombiespawn")
     net.Start("ZM_SyncSpawnPoints")
         net.WriteUInt(#spawnPoints, 8)
         for _, sp in ipairs(spawnPoints) do
@@ -143,7 +143,7 @@ net.Receive("ZM_SpawnZombie", function(len, ply)
     local spawnEntIndex = net.ReadUInt(16)
 
     local spawner = Entity(spawnEntIndex)
-    if not IsValid(spawner) or spawner:GetClass() ~= "ent_zm_spawnpoint" or not spawner:GetNWBool("Active", true) then
+    if not IsValid(spawner) or spawner:GetClass() ~= "info_zombiespawn" or not spawner:GetNWBool("Active", true) then
         ZM_Notify(ply, "Invalid or inactive spawn point!", Color(255, 100, 100))
         return
     end
@@ -424,7 +424,7 @@ end)
 
 -- Reset spawn points between rounds
 function ZM_ResetSpawnPoints()
-    for _, sp in ipairs(ents.FindByClass("ent_zm_spawnpoint")) do
+    for _, sp in ipairs(ents.FindByClass("info_zombiespawn")) do
         if IsValid(sp) and sp.Reset then
             sp:Reset()
         end
