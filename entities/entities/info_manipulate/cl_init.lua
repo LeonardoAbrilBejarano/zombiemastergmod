@@ -12,7 +12,16 @@ function ENT:Draw()
     -- Only visible to ZM
     if ply:Team() ~= TEAM_ZM then return end
 
-    self:DrawModel()
+    local active = self:GetNWBool("Active", true)
+    local pos = self:GetPos()
+    
+    -- Draw a glowing yellow sphere for the trap
+    local size = active and (15 + math.sin(CurTime() * 4) * 3) or 10
+    local alpha = active and 200 or 50
+    local color = active and Color(255, 200, 50, alpha) or Color(150, 150, 150, alpha)
+    
+    render.SetColorMaterial()
+    render.DrawSphere(pos, size, 16, 16, color)
 
     -- Draw label above
     local pos = self:GetPos() + Vector(0, 0, 40)

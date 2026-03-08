@@ -328,6 +328,7 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
             
             local eyePos = ply:EyePos()
             local clickedSpawn = nil
+            local clickedTrap = nil
             
             for _, ent in ipairs(ents.FindByClass("ent_zm_spawnpoint")) do
                 if IsValid(ent) and ent:GetNWBool("Active", true) then
@@ -341,6 +342,23 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
             
             if IsValid(clickedSpawn) then
                 ZM_OpenSpawnMenu(clickedSpawn)
+                return
+            end
+
+            for _, ent in ipairs(ents.FindByClass("info_manipulate")) do
+                if IsValid(ent) and ent:GetNWBool("Active", true) then
+                    local hitPos = util.IntersectRayWithSphere(eyePos, aimVec, ent:GetPos(), 32)
+                    if hitPos then
+                        clickedTrap = ent
+                        break
+                    end
+                end
+            end
+
+            if IsValid(clickedTrap) then
+                net.Start("ZM_ActivateManipulate")
+                    net.WriteEntity(clickedTrap)
+                net.SendToServer()
                 return
             end
 

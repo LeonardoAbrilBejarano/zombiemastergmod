@@ -121,7 +121,7 @@ end
 function ZM_SyncManipulatesToClient(ply)
     if not IsValid(ply) then return end
 
-    local manips = ents.FindByClass("ent_zm_manipulate")
+    local manips = ents.FindByClass("info_manipulate")
     net.Start("ZM_SyncManipulates")
         net.WriteUInt(#manips, 8)
         for _, m in ipairs(manips) do
@@ -406,7 +406,7 @@ net.Receive("ZM_ActivateManipulate", function(len, ply)
     if ZM_GetRoundState() ~= ROUND_ACTIVE then return end
 
     local manip = net.ReadEntity()
-    if not IsValid(manip) or manip:GetClass() ~= "ent_zm_manipulate" then return end
+    if not IsValid(manip) or manip:GetClass() ~= "info_manipulate" then return end
 
     local cost = manip:GetNWInt("Cost", 0)
     if not ZM_DeductResources(ply, cost) then

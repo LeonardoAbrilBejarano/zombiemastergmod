@@ -4,7 +4,7 @@
 ]]
 
 ENT.Type = "anim"
-ENT.Base = "base_gmodentity"
+ENT.Base = "base_anim"
 
 ENT.PrintName    = "ZM Manipulate"
 ENT.Category     = "Zombie Master"
