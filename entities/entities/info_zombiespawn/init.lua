@@ -136,7 +136,6 @@ function ENT:SpawnThink()
                         npc:SetSchedule(SCHED_FORCED_GO_RUN)
                     end
                 end
-                end
             end
         end
     end

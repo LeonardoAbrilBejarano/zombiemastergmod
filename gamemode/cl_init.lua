@@ -32,6 +32,13 @@ function GM:Initialize()
         antialias = true,
         additive = true
     })
+    
+    surface.CreateFont("TargetIDSmall", {
+        font = "Trebuchet MS",
+        size = 16,
+        weight = 900,
+        antialias = true
+    })
 end
 
 
