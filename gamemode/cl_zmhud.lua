@@ -129,13 +129,25 @@ function ZM_DrawZMInfo(w, h)
     draw.RoundedBox(6, 10, 10, 160, 30, Color(200, 30, 30, 200))
     draw.SimpleText("★ ZOMBIE MASTER", "ZM_Medium", 90, 25, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
+    local yObj = 50
     -- Round timer
     if ZM_LocalData.roundEndTime > 0 then
         local remaining = math.max(0, ZM_LocalData.roundEndTime - CurTime())
         local minutes = math.floor(remaining / 60)
         local seconds = math.floor(remaining % 60)
-        draw.SimpleText(string.format("Time: %02d:%02d", minutes, seconds), "ZM_Small", 90, 50, Color(255, 255, 255, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        draw.SimpleText(string.format("Time: %02d:%02d", minutes, seconds), "ZM_Small", 90, yObj, Color(255, 255, 255, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        yObj = 70
     end
+    
+    -- Night Vision Button
+    local mx, my = gui.MousePos()
+    local nvHovered = (mx >= 10 and mx <= 170 and my >= yObj and my <= yObj + 20)
+    local nvCol = ZM_LocalData.nightvision and Color(40, 120, 40, 200) or Color(60, 60, 60, 200)
+    if nvHovered then
+        nvCol = ZM_LocalData.nightvision and Color(60, 150, 60, 200) or Color(80, 80, 80, 200)
+    end
+    draw.RoundedBox(4, 10, yObj, 160, 20, nvCol)
+    draw.SimpleText(ZM_LocalData.nightvision and "[N] Night Vision: ON" or "[N] Night Vision", "ZM_Small", 90, yObj + 4, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
 end
 
 -- Selected zombie info (bottom center)
@@ -209,6 +221,19 @@ local zm_isDragSelecting = false
 local zm_dragStartX = 0
 local zm_dragStartY = 0
 
+-- Handle clicks on the top left panel (Night vision)
+function ZM_HandleTopLeftClick(mx, my)
+    local yObj = 50
+    if ZM_LocalData.roundEndTime > 0 then yObj = 70 end
+    
+    if mx >= 10 and mx <= 170 and my >= yObj and my <= yObj + 20 then
+        ZM_LocalData.nightvision = not ZM_LocalData.nightvision
+        surface.PlaySound("buttons/lightswitch2.wav")
+        return true
+    end
+    return false
+end
+
 -- Handle clicks on the bottom center panel
 function ZM_HandleBottomPanelClick(mx, my)
     if not ZM_LocalData.selectedZombies or #ZM_LocalData.selectedZombies == 0 then return false end
@@ -273,6 +298,9 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
     end
 
     local mx, my = gui.MousePos()
+
+    -- Check if clicking on top left panel buttons
+    if ZM_HandleTopLeftClick(mx, my) then return end
 
     -- Check if clicking on power panel buttons
     if ZM_HandlePowerPanelClick(mx, my) then return end
@@ -678,6 +706,13 @@ hook.Add("PlayerBindPress", "ZM_Binds", function(ply, bind, pressed)
         return true
     end
 
+    -- N to toggle Night Vision (assuming they use a bind or we catch it)
+    -- GMod natively binds 'N' to nothing usually, but +zoom is often used if there's no suit zoom.
+    -- We can also catch the 'impulse 100' or other keys, but since GMod doesn't pass raw keys to PlayerBindPress unless bound,
+    -- we'll rely on the UI button or if they bound a key to something generic.
+    
+    -- We'll add a 'Think' or 'ButtonPress' hook for the 'N' key specifically if we want a raw key.
+    
     -- Escape to deselect everything
     if bind == "cancelselect" then
         ZM_LocalData.currentPower = nil
@@ -731,6 +766,43 @@ hook.Add("PostDrawOpaqueRenderables", "ZM_HighlightZombies", function()
     if #allZombies > 0 then
         halo.Add(allZombies, Color(100, 200, 100, 50), 1, 1, 1)
     end
+end)
+
+-- Night Vision input check (N Key)
+local zm_nKeyWasDown = false
+hook.Add("Think", "ZM_NightVisionKey", function()
+    local ply = LocalPlayer()
+    if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+    
+    local isDown = input.IsKeyDown(KEY_N)
+    if isDown and not zm_nKeyWasDown then
+        ZM_LocalData.nightvision = not ZM_LocalData.nightvision
+        surface.PlaySound("buttons/lightswitch2.wav")
+    end
+    zm_nKeyWasDown = isDown
+end)
+
+-- Night Vision post-processing
+hook.Add("RenderScreenspaceEffects", "ZM_NightVisionEffect", function()
+    local ply = LocalPlayer()
+    if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+    if not ZM_LocalData.nightvision then return end
+
+    local colorMod = {
+        ["$pp_colour_addr"]         = 0,
+        ["$pp_colour_addg"]         = 0.05,
+        ["$pp_colour_addb"]         = 0,
+        ["$pp_colour_brightness"]   = 0.1,
+        ["$pp_colour_contrast"]     = 1.4,
+        ["$pp_colour_colour"]       = 0.4,
+        ["$pp_colour_mulr"]         = 0,
+        ["$pp_colour_mulg"]         = 0.8,
+        ["$pp_colour_mulb"]         = 0
+    }
+    
+    DrawColorModify(colorMod)
+    DrawBloom(0.5, 1.2, 5, 5, 1, 1, 0, 0.5, 0)
+    -- Add a faint green vignette or overlay if you want, but ColorModify + Bloom usually looks good for NVG.
 end)
 
 -- Draw drag selection box
