@@ -33,7 +33,7 @@ resource.AddWorkshop("3653148203") -- [ARC9] WTT CZ Scorpion EVO 3
 resource.AddWorkshop("3681277326")
 
 -- Set server to allow client downloads if not set
-RunConsoleCommand("sv_allowdownload", "1")
+RunConsoleCommand("sv_allowdownload", "0")
 RunConsoleCommand("sv_allowupload", "1")
 
 
