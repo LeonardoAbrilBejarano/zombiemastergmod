@@ -11,6 +11,7 @@ include("sv_buymenu.lua")
 -- Set up a player as the Zombie Master
 function ZM_SetupZMPlayer(ply)
     ply:SetTeam(TEAM_ZM)
+    ply.isPossessing = false
     ply:StripWeapons()
     ply:SetHealth(1)
     ply:GodEnable()

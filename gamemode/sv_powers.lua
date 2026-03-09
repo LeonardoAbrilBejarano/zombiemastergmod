@@ -7,8 +7,17 @@
 net.Receive("ZM_UsePower", function(len, ply)
     if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
     if ZM_GetRoundState() ~= ROUND_ACTIVE then return end
+    if ply.isPossessing then return end -- cannot use other powers while possessing
 
     local powerType = net.ReadString()
+
+    -- possession uses an entity argument instead of a position
+    if powerType == "possess" then
+        local npc = net.ReadEntity()
+        ZM_Power_Possess(ply, npc)
+        return
+    end
+
     local targetPos = net.ReadVector()
 
     if powerType == "physexplode" then
@@ -286,3 +295,144 @@ function ZM_Power_AnywhereSpawn(ply, location)
         ZM_Notify(ply, "Anywhere shambler spawned.", Color(100, 255, 100))
     end
 end
+
+
+--[[
+    Possess - turn the Zombie Master into one of his selected zombies.
+    The zombie entity is removed and the player adopts its model/position.
+    When the player dies while possessing, they revert back to overhead ZM.
+]]
+function ZM_Power_Possess(ply, npc)
+    if not IsValid(npc) or not npc:IsNPC() then
+        ZM_Notify(ply, "No valid zombie selected!", Color(255, 100, 100))
+        return
+    end
+    if npc.zmOwner ~= ply then
+        ZM_Notify(ply, "You can only possess your own zombies!", Color(255, 100, 100))
+        return
+    end
+
+    local cost = ZM_CONFIG.TRANSFORM_COST
+    if (ply.zmResources or 0) < cost then
+        ZM_Notify(ply, "Not enough resources! Need " .. cost, Color(255, 100, 100))
+        return
+    end
+
+    -- capture NPC details and then delete it; we'll respawn later
+    local pos = npc:GetPos()
+    print("[ZM] possess npc pos", pos)
+    local model = npc:GetModel()
+    local health = npc:Health()
+    local ztypeId = npc.zmType
+
+    -- determine hull dimensions now in case the entity loses methods later
+    local hullmins, hullmaxs = Vector(-16,-16,0), Vector(16,16,72)
+    if npc.GetHullMins then
+        hullmins = npc:GetHullMins() or hullmins
+        hullmaxs = npc:GetHullMaxs() or hullmaxs
+    end
+    -- debug: print hull sizes so we can see what's being used
+    print("[ZM] possess hullmins", hullmins, "hullmaxs", hullmaxs)
+
+    -- remove the NPC completely to avoid collision oddities
+    npc:Remove()
+
+    -- store data for respawn/revert
+    ply.possessedNPCdata = {
+        ztype = ztypeId,
+        model = model,
+        health = health,
+        hullmins = hullmins,
+        hullmaxs = hullmaxs,
+    }
+
+    ZM_RecalcPopulation(ply)
+
+    -- mark player as controlling a zombie
+    ply.isPossessing = true
+
+    -- make player visible and reset ZM state
+    ply:SetRenderMode(RENDERMODE_NORMAL)
+    ply:SetColor(Color(255,255,255,255))
+    ply:DrawShadow(true)
+    ply:GodDisable()
+    ply:SetMoveType(MOVETYPE_WALK)
+
+    -- teleport and change appearance; initial position is NPC origin
+    ply:SetPos(pos)
+
+    ply:SetModel(model or "models/zombie/classic.mdl")
+    ply:SetHealth(health)
+    ply:SetMaxHealth(health)
+
+    -- adjust collision hull to match the zombie BEFORE moving further
+    local mins, maxs = hullmins, hullmaxs
+    ply:SetHull(mins, maxs)
+    ply:SetHullDuck(mins * 0.5, maxs * 0.5)
+
+    -- perform a hull trace downward so the player doesn't spawn half‑buried
+    local startpos = ply:GetPos() + Vector(0,0,50)
+    local tr = util.TraceHull({
+        start = startpos,
+        endpos = startpos - Vector(0,0,150),
+        mins = mins,
+        maxs = maxs,
+        mask = MASK_PLAYERSOLID,
+        filter = ply
+    })
+    if tr.Hit then
+        -- nudge the result up slightly; trace returns a point on the floor, which can
+        -- leave part of the hull intersecting the world and trigger a fall-through.
+        local finalpos = tr.HitPos + Vector(0,0,1)
+        ply:SetPos(finalpos)
+    else
+        ply:DropToFloor() -- fallback if trace fails
+    end
+
+    -- make absolutely sure we end up on the ground in case the trace was dubious
+    ply:DropToFloor()
+
+    -- slow the player down to zombie pace and prevent noclip
+    ply:SetWalkSpeed(120)
+    ply:SetRunSpeed(120)
+
+    -- strip any survivor gear and give them a basic melee weapon so they have
+    -- something visible to swing while possessing
+    ply:StripWeapons()
+    ply:Give("weapon_crowbar")
+
+    ZM_DeductResources(ply, cost)
+    ZM_Notify(ply, "You possess a zombie! Press Z to return or die to automatically revert.", Color(200, 50, 200))
+end
+
+
+-- Handle possession revert request from client
+util.AddNetworkString("ZM_RevertPossess")
+net.Receive("ZM_RevertPossess", function(len, ply)
+    if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+    if not ply.isPossessing then return end
+
+    -- respawn the zombie using stored data
+    if ply.possessedNPCdata then
+        local data = ply.possessedNPCdata
+        local ztype = ZM_ZOMBIE_BY_ID[data.ztype]
+        if ztype then
+            local newnpc = ZM_SpawnZombie(ply, ztype, ply:GetPos())
+            if IsValid(newnpc) then
+                newnpc:SetModel(data.model)
+                newnpc:SetHealth(data.health)
+                newnpc:SetMaxHealth(data.health)
+            end
+        end
+        ply.possessedNPCdata = nil
+        ZM_RecalcPopulation(ply)
+    end
+
+    -- reset player back to ZM form
+    ply.isPossessing = false
+    ply:StripWeapons()
+    ply:ResetHull()
+    ply:SetTeam(TEAM_ZM)
+    ZM_SetupZMPlayer(ply)
+    ply:Spawn()
+end)

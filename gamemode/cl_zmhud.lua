@@ -9,7 +9,7 @@ local zm_panel = nil
 -- ZM-specific click handling
 hook.Add("HUDPaint", "ZM_OverheadHUD", function()
     local ply = LocalPlayer()
-    if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+    if not IsValid(ply) or ply:Team() ~= TEAM_ZM or ply.isPossessing then return end
 
     local w, h = ScrW(), ScrH()
 
@@ -80,6 +80,7 @@ function ZM_DrawPowerPanel(w, h)
         { id = "physexplode", name = "Phys Explode",    cost = ZM_CONFIG.PHYSEXPLODE_COST,    color = Color(255, 140, 30), desc = "Delayed explosion" },
         { id = "spotcreate",  name = "Hidden Spawn",    cost = ZM_CONFIG.SPOTCREATE_COST,      color = Color(100, 200, 100), desc = "Spawn unseen zombie" },
         { id = "anywhere",    name = "Anywhere Spawn",  cost = ZM_CONFIG.ANYWHERE_SPAWN_COST, color = Color(150, 150, 255), desc = "Spawn shambler anywhere (ZM must be hidden & >200u away)" },
+        { id = "possess",     name = "Possess Zombie",  cost = ZM_CONFIG.TRANSFORM_COST,     color = Color(200, 50, 200), desc = "Take control of a selected zombie (press Z to revert)" },
     }
 
     -- Compute panel height based on number of powers plus title area
@@ -100,6 +101,7 @@ function ZM_DrawPowerPanel(w, h)
         { id = "physexplode", name = "Phys Explode",    cost = ZM_CONFIG.PHYSEXPLODE_COST,    color = Color(255, 140, 30), desc = "Delayed explosion" },
         { id = "spotcreate",  name = "Hidden Spawn",    cost = ZM_CONFIG.SPOTCREATE_COST,      color = Color(100, 200, 100), desc = "Spawn unseen zombie" },
         { id = "anywhere",    name = "Anywhere Spawn",  cost = ZM_CONFIG.ANYWHERE_SPAWN_COST, color = Color(150, 150, 255), desc = "Spawn shambler anywhere (ZM must be hidden & >200u away)" },
+        { id = "possess",     name = "Possess Zombie",  cost = ZM_CONFIG.TRANSFORM_COST,     color = Color(200, 50, 200), desc = "Take control of a selected zombie (press Z to revert)" },
     }
 
     for _, power in ipairs(powers) do
@@ -267,7 +269,7 @@ end
 -- ZM Mouse input handling (left-click only for GUI actions)
 hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
     local ply = LocalPlayer()
-    if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+    if not IsValid(ply) or ply:Team() ~= TEAM_ZM or ply.isPossessing then return end
 
     if mouseCode == MOUSE_RIGHT then
         -- Cancel drag selection if starting a right-click action
@@ -324,15 +326,39 @@ hook.Add("GUIMousePressed", "ZM_MousePress", function(mouseCode, aimVector)
         if zm_rightMouseHeld then return end -- Block left clicks if right-click action is active
         
         if ZM_LocalData.currentPower then
-            -- Use power at target location
-            local tr = ZM_GetCursorTrace(ply)
-            if tr.Hit then
+            if ZM_LocalData.currentPower == "possess" then
+                -- first try to pick the zombie under the cursor, falls back to selection
+                local tr = ZM_GetCursorTrace(ply)
+                local targetNpc = nil
+                if IsValid(tr.Entity) and tr.Entity:IsNPC() then
+                    targetNpc = tr.Entity
+                elseif #ZM_LocalData.selectedZombies > 0 then
+                    targetNpc = ZM_LocalData.selectedZombies[1]
+                end
+
+                if not IsValid(targetNpc) then
+                    ZM_ShowNotification("No zombie targeted or selected!", Color(255,100,100))
+                else
+                    net.Start("ZM_UsePower")
+                        net.WriteString("possess")
+                        net.WriteEntity(targetNpc)
+                    net.SendToServer()
+                    ZM_LocalData.selectedZombies = {}
+                    ZM_LocalData.currentPower = nil
+                end
+            else
                 net.Start("ZM_UsePower")
                     net.WriteString(ZM_LocalData.currentPower)
-                    net.WriteVector(tr.HitPos)
+                    -- Use power at target location
+                    local tr = ZM_GetCursorTrace(ply)
+                    if tr.Hit then
+                        net.WriteVector(tr.HitPos)
+                    else
+                        net.WriteVector(Vector(0,0,0))
+                    end
                 net.SendToServer()
+                ZM_LocalData.currentPower = nil
             end
-            ZM_LocalData.currentPower = nil
         else
             -- Check if we clicked on a Spawn Point Sphere
             local aimVec = gui.ScreenToVector(mx, my)
@@ -469,7 +495,7 @@ end
 local zm_wasZM = false
 hook.Add("GUIMouseReleased", "ZM_MouseRelease", function(mouseCode, aimVector)
     local ply = LocalPlayer()
-    if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+    if not IsValid(ply) or ply:Team() ~= TEAM_ZM or ply.isPossessing then return end
 
     if mouseCode == MOUSE_LEFT and zm_isDragSelecting then
         zm_isDragSelecting = false
@@ -618,6 +644,7 @@ function ZM_HandlePowerPanelClick(mx, my)
         { id = "physexplode" },
         { id = "spotcreate" },
         { id = "anywhere" },
+        { id = "possess" },
     }
 
     -- compute vertical offset same as draw
@@ -632,6 +659,25 @@ function ZM_HandlePowerPanelClick(mx, my)
         local btnW = panelW - padding * 2
 
         if mx >= btnX and mx <= btnX + btnW and my >= y and my <= y + btnH then
+            if powerId == "possess" then
+                -- if we already have a selected zombie, just use the power immediately
+                if #ZM_LocalData.selectedZombies > 0 then
+                    local npc = ZM_LocalData.selectedZombies[1]
+                    if IsValid(npc) and (ZM_LocalData.resources or 0) >= ZM_CONFIG.TRANSFORM_COST then
+                        net.Start("ZM_UsePower")
+                            net.WriteString("possess")
+                            net.WriteEntity(npc)
+                        net.SendToServer()
+                        ZM_LocalData.selectedZombies = {}
+                        -- consume the power click but don't toggle state
+                        return true
+                    else
+                        ZM_ShowNotification("Cannot possess: no resources or invalid target.", Color(255,100,100))
+                        return true
+                    end
+                end
+            end
+
             if ZM_LocalData.currentPower == powerId then
                 ZM_LocalData.currentPower = nil -- Toggle off
             else
@@ -696,7 +742,7 @@ end
 -- ZM keyboard shortcuts
 hook.Add("PlayerBindPress", "ZM_Binds", function(ply, bind, pressed)
     if not pressed then return end
-    if ply:Team() ~= TEAM_ZM then return end
+    if ply:Team() ~= TEAM_ZM or ply.isPossessing then return end
 
     -- Q for PhysExplode
     if bind == "lastinv" then
@@ -774,7 +820,7 @@ end)
 -- Show cursor for ZM (but not while right-clicking for camera rotation)
 hook.Add("InputMouseApply", "ZM_ShowCursor", function(cmd, x, y, angle)
     local ply = LocalPlayer()
-    if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+    if not IsValid(ply) or ply:Team() ~= TEAM_ZM or ply.isPossessing then return end
 
     -- Don't re-enable cursor while right-click is held (camera rotation mode)
     if zm_rightMouseHeld then return end
@@ -790,7 +836,7 @@ end)
 -- Draw selected zombie highlights in the world
 hook.Add("PostDrawOpaqueRenderables", "ZM_HighlightZombies", function()
     local ply = LocalPlayer()
-    if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+    if not IsValid(ply) or ply:Team() ~= TEAM_ZM or ply.isPossessing then return end
 
     -- Draw halos on selected zombies
     local selected = {}
@@ -816,12 +862,24 @@ hook.Add("PostDrawOpaqueRenderables", "ZM_HighlightZombies", function()
         halo.Add(allZombies, Color(100, 200, 100, 50), 1, 1, 1)
     end
 end)
+-- Possession revert key (Z)
+local zm_zWasDown = false
+hook.Add("Think", "ZM_PossessRevertKey", function()
+    local ply = LocalPlayer()
+    if not IsValid(ply) or not ply.isPossessing then return end
 
+    local isDown = input.IsKeyDown(KEY_Z)
+    if isDown and not zm_zWasDown then
+        net.Start("ZM_RevertPossess")
+        net.SendToServer()
+    end
+    zm_zWasDown = isDown
+end)
 -- Night Vision input check (N Key)
 local zm_nKeyWasDown = false
 hook.Add("Think", "ZM_NightVisionKey", function()
     local ply = LocalPlayer()
-    if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+    if not IsValid(ply) or ply:Team() ~= TEAM_ZM or ply.isPossessing then return end
     
     local isDown = input.IsKeyDown(KEY_N)
     if isDown and not zm_nKeyWasDown then
@@ -834,7 +892,7 @@ end)
 -- Night Vision post-processing
 hook.Add("RenderScreenspaceEffects", "ZM_NightVisionEffect", function()
     local ply = LocalPlayer()
-    if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+    if not IsValid(ply) or ply:Team() ~= TEAM_ZM or ply.isPossessing then return end
     if not ZM_LocalData.nightvision then return end
 
     local colorMod = {
@@ -857,7 +915,7 @@ end)
 -- Draw drag selection box
 hook.Add("HUDPaint", "ZM_DrawDragSelect", function()
     local ply = LocalPlayer()
-    if not IsValid(ply) or ply:Team() ~= TEAM_ZM then return end
+    if not IsValid(ply) or ply:Team() ~= TEAM_ZM or ply.isPossessing then return end
 
     if zm_isDragSelecting then
         local mx, my = gui.MousePos()

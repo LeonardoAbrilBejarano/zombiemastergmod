@@ -50,6 +50,7 @@ ZM_CONFIG = {
     -- 200 units away from all of them.  This is intended to be a more expensive
     -- specialised ability described in the worktask notes.
     ANYWHERE_SPAWN_COST  = 300,  -- must be greater than SPOTCREATE_COST
+    TRANSFORM_COST        = 75,   -- cost to possess a zombie and become it briefly (reduced per request)
 
     -- Round
     ROUND_WAIT_TIME     = 15,       -- Seconds to wait for players
@@ -106,6 +107,7 @@ if SERVER then
     util.AddNetworkString("ZM_ObjectiveUpdate")
     util.AddNetworkString("ZM_BuyItem")
     util.AddNetworkString("ZM_AutoAttack")
+    util.AddNetworkString("ZM_RevertPossess")
 end
 
 --[[---------------------------------------------------------

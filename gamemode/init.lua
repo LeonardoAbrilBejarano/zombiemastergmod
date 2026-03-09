@@ -148,6 +148,35 @@ end
     Player Death
 -----------------------------------------------------------]]
 function GM:PlayerDeath(ply, inflictor, attacker)
+    -- if ZM was possessing a zombie, he immediately returns to overhead form
+    if ply.isPossessing then
+        -- respawn the zombie from stored data if available
+        if ply.possessedNPCdata then
+            local data = ply.possessedNPCdata
+            local ztype = ZM_ZOMBIE_BY_ID[data.ztype]
+            if ztype then
+                local newnpc = ZM_SpawnZombie(ply, ztype, ply:GetPos())
+                if IsValid(newnpc) then
+                    newnpc:SetModel(data.model)
+                    newnpc:SetHealth(data.health)
+                    newnpc:SetMaxHealth(data.health)
+                end
+            end
+            ply.possessedNPCdata = nil
+        end
+        ply.isPossessing = false
+        ply:ResetHull() -- make sure player returns to normal collision
+
+        timer.Simple(0.1, function()
+            if IsValid(ply) then
+                ply:SetTeam(TEAM_ZM)
+                ZM_SetupZMPlayer(ply)
+                ply:Spawn()
+            end
+        end)
+        return
+    end
+
     if ply:Team() == TEAM_ZM then
         -- ZM can't really die, but just in case
         return
@@ -331,10 +360,71 @@ hook.Add("OnEntityCreated", "ZM_NPCRelationships", function(ent)
     end
 end)
 
+--[[
+    While the ZM is possessing a zombie we allow a simple melee attack
+    to damage nearby survivors.  This gives the feel of a zombie bite.
+]]
+hook.Add("PlayerButtonDown", "ZM_PossessMelee", function(ply, btn)
+    if not IsValid(ply) or not ply.isPossessing then return end
+    if btn ~= MOUSE_LEFT then return end
+
+    -- tiny cooldown so they can't mash it too fast
+    ply.nextPossessAttack = ply.nextPossessAttack or 0
+    if CurTime() < ply.nextPossessAttack then return end
+    ply.nextPossessAttack = CurTime() + 0.5
+
+    local start = ply:GetPos() + Vector(0,0,20)
+    local forward = ply:EyeAngles():Forward()
+    local tr = util.TraceHull({
+        start = start,
+        endpos = start + forward * 60,
+        mins = Vector(-16,-16,-10),
+        maxs = Vector(16,16,10),
+        filter = ply,
+        mask = MASK_SHOT_HULL
+    })
+
+    if tr.Hit and IsValid(tr.Entity) and tr.Entity:IsPlayer() and tr.Entity:Team() == TEAM_SURVIVORS then
+        local dmg = DamageInfo()
+        dmg:SetDamage(25)
+        dmg:SetAttacker(ply)
+        dmg:SetInflictor(ply)
+        tr.Entity:TakeDamageInfo(dmg)
+    end
+end)
+
+-- passive bump damage so the possessor behaves like a walking zombie
+hook.Add("PlayerTick", "ZM_PossessBumpDamage", function(ply, mv)
+    if not IsValid(ply) or not ply.isPossessing then return end
+    ply.possessBumpNext = ply.possessBumpNext or 0
+    if CurTime() < ply.possessBumpNext then return end
+
+    for _, ent in ipairs(ents.FindInSphere(ply:GetPos(), 50)) do
+        if IsValid(ent) and ent:IsPlayer() and ent:Team() == TEAM_SURVIVORS then
+            local dmg = DamageInfo()
+            dmg:SetDamage(15)
+            dmg:SetAttacker(ply)
+            dmg:SetInflictor(ply)
+            ent:TakeDamageInfo(dmg)
+            ply.possessBumpNext = CurTime() + 0.5
+            break
+        end
+    end
+end)
+
 --[[---------------------------------------------------------
     Prevent friendly fire between survivors
 -----------------------------------------------------------]]
 function GM:PlayerShouldTakeDamage(ply, attacker)
+    -- if the ZM is currently possessing a zombie, survivors should be able
+    -- to hurt him even though his team is TEAM_ZM.  We detect that with a
+    -- flag set by the possession power.
+    if ply.isPossessing then
+        if IsValid(attacker) and attacker:IsPlayer() and attacker:Team() == TEAM_SURVIVORS then
+            return true
+        end
+    end
+
     if IsValid(attacker) and attacker:IsPlayer() then
         if ply:Team() == TEAM_SURVIVORS and attacker:Team() == TEAM_SURVIVORS then
             return false -- No friendly fire
