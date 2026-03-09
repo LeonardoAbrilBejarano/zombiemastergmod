@@ -63,9 +63,38 @@ function GM:PlayerInitialSpawn(ply)
 end
 
 --[[---------------------------------------------------------
+    Helper
+-----------------------------------------------------------]]
+
+-- Clear any state that was applied when a player became the Zombie Master.
+-- This includes invisibility, no-collide, godmode, noclip movement, etc.
+-- We call this any time a player leaves TEAM_ZM so they don't remain
+-- invisible or otherwise stuck in ZM mode.
+local function ZM_ClearPlayerState(ply)
+    if not IsValid(ply) then return end
+    ply:SetRenderMode(RENDERMODE_NORMAL)
+    ply:SetColor(Color(255, 255, 255, 255))
+    ply:DrawShadow(true)
+    ply:SetNoDraw(false)
+    ply:SetNotSolid(false)
+    ply:SetNoTarget(false)
+    ply:SetMoveType(MOVETYPE_WALK)
+    ply:GodDisable()
+end
+
+
+--[[---------------------------------------------------------
     Player Spawn
 -----------------------------------------------------------]]
 function GM:PlayerSpawn(ply)
+    -- Reset any leftover ZM flags before normal spawn logic runs.  The
+    -- spawn call happens when someone changes teams (either to survivors
+    -- or as part of the ZM-replacement code), so this ensures they become
+    -- visible again.
+    if ply:Team() ~= TEAM_ZM then
+        ZM_ClearPlayerState(ply)
+    end
+
     if ply:Team() == TEAM_ZM then
         -- ZM is set up separately
         return
@@ -217,6 +246,8 @@ net.Receive("ZM_JoinTeam", function(len, ply)
     local teamId = net.ReadUInt(4)
 
     if teamId == TEAM_SURVIVORS then
+        -- leaving ZM, ensure we clear any ZM-only state immediately
+        ZM_ClearPlayerState(ply)
         ply:SetTeam(TEAM_SURVIVORS)
         ZM_Notify(ply, "You have joined the Survivors!", Color(60, 180, 60))
 
@@ -267,6 +298,8 @@ net.Receive("ZM_JoinTeam", function(len, ply)
         end
 
     elseif teamId == TEAM_SPECTATOR then
+        -- leaving ZM to spectate, clear render flags as well
+        ZM_ClearPlayerState(ply)
         ply:SetTeam(TEAM_SPECTATOR)
         ply:Spectate(OBS_MODE_ROAMING)
         ZM_Notify(ply, "You are now spectating.", Color(150, 150, 150))
