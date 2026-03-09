@@ -72,12 +72,23 @@ end
 function ZM_DrawPowerPanel(w, h)
     local panelW = 180
     local panelX = w - panelW - 10
-    local panelY = h / 2 - 100
     local btnH = 60
     local padding = 5
 
+    -- build power list locally so we can compute height
+    local powers = {
+        { id = "physexplode", name = "Phys Explode",    cost = ZM_CONFIG.PHYSEXPLODE_COST,    color = Color(255, 140, 30), desc = "Delayed explosion" },
+        { id = "spotcreate",  name = "Hidden Spawn",    cost = ZM_CONFIG.SPOTCREATE_COST,      color = Color(100, 200, 100), desc = "Spawn unseen zombie" },
+        { id = "anywhere",    name = "Anywhere Spawn",  cost = ZM_CONFIG.ANYWHERE_SPAWN_COST, color = Color(150, 150, 255), desc = "Spawn shambler anywhere (ZM must be hidden & >200u away)" },
+    }
+
+    -- Compute panel height based on number of powers plus title area
+    local panelH = 30 + (#powers * (btnH + padding)) + padding
+    -- center the panel vertically on screen
+    local panelY = h / 2 - panelH / 2
+
     -- Panel background
-    draw.RoundedBox(8, panelX, panelY, panelW, 180, Color(20, 20, 30, 220))
+    draw.RoundedBox(8, panelX, panelY, panelW, panelH, Color(20, 20, 30, 220))
 
     -- Title
     draw.SimpleText("ZM POWERS", "ZM_Small", panelX + panelW / 2, panelY + 8, Color(255, 200, 50), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
@@ -86,8 +97,9 @@ function ZM_DrawPowerPanel(w, h)
 
     -- PhysExplode button
     local powers = {
-        { id = "physexplode", name = "Phys Explode",  cost = ZM_CONFIG.PHYSEXPLODE_COST, color = Color(255, 140, 30), desc = "Delayed explosion" },
-        { id = "spotcreate",  name = "Hidden Spawn",  cost = ZM_CONFIG.SPOTCREATE_COST,  color = Color(100, 200, 100), desc = "Spawn unseen zombie" },
+        { id = "physexplode", name = "Phys Explode",    cost = ZM_CONFIG.PHYSEXPLODE_COST,    color = Color(255, 140, 30), desc = "Delayed explosion" },
+        { id = "spotcreate",  name = "Hidden Spawn",    cost = ZM_CONFIG.SPOTCREATE_COST,      color = Color(100, 200, 100), desc = "Spawn unseen zombie" },
+        { id = "anywhere",    name = "Anywhere Spawn",  cost = ZM_CONFIG.ANYWHERE_SPAWN_COST, color = Color(150, 150, 255), desc = "Spawn shambler anywhere (ZM must be hidden & >200u away)" },
     }
 
     for _, power in ipairs(powers) do
@@ -598,16 +610,24 @@ end)
 -- Handle clicks on power panel
 function ZM_HandlePowerPanelClick(mx, my)
     local panelW = 180
-    local panelX = ScrW() - panelW - 10
-    local panelY = ScrH() / 2 - 100
     local btnH = 60
     local padding = 5
 
+    -- replicate power list from draw routine so they stay in sync
+    local powers = {
+        { id = "physexplode" },
+        { id = "spotcreate" },
+        { id = "anywhere" },
+    }
+
+    -- compute vertical offset same as draw
+    local panelH = 30 + (#powers * (btnH + padding)) + padding
+    local panelX = ScrW() - panelW - 10
+    local panelY = ScrH() / 2 - panelH / 2
     local y = panelY + 30
 
-    local powers = {"physexplode", "spotcreate"}
-
-    for _, powerId in ipairs(powers) do
+    for _, pinfo in ipairs(powers) do
+        local powerId = pinfo.id
         local btnX = panelX + padding
         local btnW = panelW - padding * 2
 
@@ -707,6 +727,17 @@ hook.Add("PlayerBindPress", "ZM_Binds", function(ply, bind, pressed)
             net.Start("ZM_SetRally")
                 net.WriteVector(tr.HitPos)
             net.SendToServer()
+        end
+        return true
+    end
+
+    -- 3 key (slot3) toggles the new anywhere-spawn power
+    if bind == "slot3" then
+        if ZM_LocalData.currentPower == "anywhere" then
+            ZM_LocalData.currentPower = nil
+        else
+            ZM_LocalData.currentPower = "anywhere"
+            ZM_LocalData.spawnType = nil
         end
         return true
     end

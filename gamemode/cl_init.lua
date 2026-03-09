@@ -50,7 +50,7 @@ ZM_LocalData = {
     roundState  = ROUND_WAITING,
     roundEndTime = 0,
     selectedZombies = {},
-    currentPower = nil,  -- "physexplode", "spotcreate", or nil
+    currentPower = nil,  -- "physexplode", "spotcreate", "anywhere", or nil
     spawnType = nil,      -- zombie type ID to spawn, or nil
 }
 

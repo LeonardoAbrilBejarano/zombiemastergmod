@@ -45,6 +45,12 @@ ZM_CONFIG = {
 
     SPOTCREATE_COST     = 100,
 
+    -- New power: allow the ZM to place a hidden shambler anywhere on the map
+    -- as long as the ZM himself is not visible to any survivor and is at least
+    -- 200 units away from all of them.  This is intended to be a more expensive
+    -- specialised ability described in the worktask notes.
+    ANYWHERE_SPAWN_COST  = 300,  -- must be greater than SPOTCREATE_COST
+
     -- Round
     ROUND_WAIT_TIME     = 15,       -- Seconds to wait for players
     ROUND_POST_TIME     = 10,       -- Seconds after round end before next

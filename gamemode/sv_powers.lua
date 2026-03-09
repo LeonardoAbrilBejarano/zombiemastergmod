@@ -15,6 +15,8 @@ net.Receive("ZM_UsePower", function(len, ply)
         ZM_Power_PhysExplode(ply, targetPos)
     elseif powerType == "spotcreate" then
         ZM_Power_SpotCreate(ply, targetPos)
+    elseif powerType == "anywhere" then
+        ZM_Power_AnywhereSpawn(ply, targetPos)
     end
 end)
 
@@ -210,5 +212,77 @@ function ZM_Power_SpotCreate(ply, location)
         ZM_DeductResources(ply, cost)
         ZM_RecalcPopulation(ply)
         ZM_Notify(ply, "Hidden zombie spawned.", Color(100, 255, 100))
+    end
+end
+
+
+--[[
+    AnywhereSpawn - shambler can be placed anywhere (ignore target LOS) as
+    long as the ZM himself is not currently visible to survivors and is far
+    enough away.  This is a more expensive alternative to spot-create and is
+    activated via the new "Anywhere Spawn" power.
+]]
+function ZM_Power_AnywhereSpawn(ply, location)
+    if not location or not isvector(location) then
+        ZM_Notify(ply, "Invalid location!", Color(255, 100, 100))
+        return
+    end
+
+    local cost = ZM_CONFIG.ANYWHERE_SPAWN_COST
+    -- Check resources but don't deduct until after we verify the spawn succeeded
+    if (ply.zmResources or 0) < cost then
+        ZM_Notify(ply, "Not enough resources! Need " .. cost, Color(255, 100, 100))
+        return
+    end
+
+    -- Trace down to find the floor and ensure the zombie fits
+    local trFloor = util.TraceHull({
+        start = location + Vector(0, 0, 25),
+        endpos = location - Vector(0, 0, 25),
+        mins = Vector(-16, -16, 0),
+        maxs = Vector(16, 16, 72),
+        mask = MASK_NPCSOLID,
+    })
+
+    if trFloor.Fraction == 1.0 then
+        ZM_Notify(ply, "The zombie does not fit in that location!", Color(255, 100, 100))
+        return
+    end
+
+    location = trFloor.HitPos
+
+    -- Ensure no survivor can see the ZM or is within 200 units
+    for _, survivor in ipairs(player.GetAll()) do
+        if IsValid(survivor) and survivor:Team() == TEAM_SURVIVORS and survivor:Alive() then
+            if survivor:GetPos():Distance(ply:GetPos()) < 200 then
+                ZM_Notify(ply, "You must be at least 200 units away from all survivors!", Color(255, 100, 100))
+                return
+            end
+
+            local tr = util.TraceLine({
+                start = survivor:EyePos(),
+                endpos = ply:GetPos(),
+                mask = MASK_OPAQUE,
+            })
+            if tr.Fraction == 1.0 then
+                ZM_Notify(ply, "A survivor can see your position!", Color(255, 100, 100))
+                return
+            end
+        end
+    end
+
+    -- Population cap check
+    local shambler = ZM_ZOMBIE_BY_ID["shambler"]
+    if (ply.zmPopulation or 0) + shambler.popCost > (ply.zmMaxPop or ZM_CONFIG.MAX_ZOMBIES) then
+        ZM_Notify(ply, "Population limit reached!", Color(255, 100, 100))
+        return
+    end
+
+    -- Spawn it
+    local npc = ZM_SpawnZombie(ply, shambler, location)
+    if npc then
+        ZM_DeductResources(ply, cost)
+        ZM_RecalcPopulation(ply)
+        ZM_Notify(ply, "Anywhere shambler spawned.", Color(100, 255, 100))
     end
 end
