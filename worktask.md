@@ -1,9 +1,3 @@
-- Feature 6.1:
-  Cuando entran personas al servidor, no se descargan correctamente las dependencias de las armas del tarkov ni del mapa del zombie master, saltando errores y texturas rosas.
-
-- Feature 7:
-  El zombie master puede tener habilidades especiales. Estas son activar trampas que aparecerán como esferas amarillas en el mapa, spawnear zombies donde quiera con un coste superior de dinero mientras no este visible para los jugadores ni a una distancia de 200 unidades de los jugadores, o convertirse en un ente especial por un precio muy alto.
-
 - Feature 8:
   En el mapa hns_mallparking_short no funciona bien las misiones hechas en lua, revisar porque las baterias no se pueden mover.
 
@@ -18,3 +12,6 @@
 
 -Feature 12:
   Balanceo de armas y daño de los zombies.
+
+- Feature 13:
+  Cuando entran personas al servidor, no se descargan correctamente las dependencias de las armas del tarkov ni del mapa del zombie master, saltando errores y texturas rosas.
